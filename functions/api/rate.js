@@ -5,8 +5,17 @@ const COUNTRY_CURRENCY_MAP = {
     'SG': 'SGD', 'HK': 'HKD', 'MY': 'MYR', 'TW': 'TWD', 'JP': 'JPY',
     'KR': 'KRW', 'CN': 'CNY', 'TH': 'THB', 'US': 'USD', 'CA': 'CAD',
     'MX': 'MXN', 'AU': 'AUD', 'NZ': 'NZD',
-    'PH': 'USD' // Default to USD per requirements for inside PH
+    'PH': 'PHP' // Default to PHP per new requirements
 };
+
+const CURRENCY_SYMBOLS = {
+    'SAR': '﷼', 'AED': 'د.إ', 'QAR': '﷼', 'KWD': 'د.ك', 'OMR': '﷼',
+    'BHD': '.د.ب', 'GBP': '£', 'EUR': '€', 'CHF': 'CHF', 'NOK': 'kr',
+    'SEK': 'kr', 'SGD': '$', 'HKD': '$', 'MYR': 'RM', 'TWD': 'NT$',
+    'JPY': '¥', 'KRW': '₩', 'CNY': '¥', 'THB': '฿', 'USD': '$',
+    'CAD': '$', 'MXN': '$', 'AUD': '$', 'NZD': '$', 'PHP': '₱'
+};
+
 
 // In-memory rate limiting map for this isolate
 const rateLimitMap = new Map();
@@ -37,14 +46,18 @@ export async function onRequest(context) {
 
     // 2. Safely Get & Sanitize User Info
     const rawUserId = request.headers.get('x-user-id');
-    const rawUserName = decodeURIComponent(request.headers.get('x-user-name') || 'Guest');
-    
-    const userId = sanitizeString(rawUserId);
-    const userName = sanitizeString(rawUserName);
+    const url = new URL(request.url);
+    const customCurrency = url.searchParams.get('currency');
     const country = request.cf?.country || 'US';
     
     // 3. Determine Local Currency
     let localCurrency = COUNTRY_CURRENCY_MAP[country] || 'USD';
+    
+    // Override if custom is provided and valid
+    if (customCurrency && CURRENCY_SYMBOLS[customCurrency]) {
+        localCurrency = customCurrency;
+    }
+    
     const targetCurrency = 'PHP';
     
     // 4. Update/Log User
@@ -118,7 +131,9 @@ export async function onRequest(context) {
         from_currency: localCurrency,
         to_currency: targetCurrency,
         rate: finalRate,
-        country: country
+        country: country,
+        symbol: CURRENCY_SYMBOLS[localCurrency] || '',
+        target_symbol: '₱'
     }, {
         headers: {
             'Cache-Control': 'public, max-age=60, s-maxage=300' // Edge caches for 5 mins, Browser for 1 min

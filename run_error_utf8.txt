@@ -1,0 +1,168 @@
+﻿Deploy	Set up job	∩╗┐2026-03-21T16:49:03.1148199Z Current runner version: '2.332.0'
+Deploy	Set up job	2026-03-21T16:49:03.1173231Z ##[group]Runner Image Provisioner
+Deploy	Set up job	2026-03-21T16:49:03.1174059Z Hosted Compute Agent
+Deploy	Set up job	2026-03-21T16:49:03.1174589Z Version: 20260213.493
+Deploy	Set up job	2026-03-21T16:49:03.1175331Z Commit: 5c115507f6dd24b8de37d8bbe0bb4509d0cc0fa3
+Deploy	Set up job	2026-03-21T16:49:03.1176026Z Build Date: 2026-02-13T00:28:41Z
+Deploy	Set up job	2026-03-21T16:49:03.1176681Z Worker ID: {8786cf4a-0d7d-4a02-b293-cb799ee056ae}
+Deploy	Set up job	2026-03-21T16:49:03.1177510Z Azure Region: northcentralus
+Deploy	Set up job	2026-03-21T16:49:03.1178081Z ##[endgroup]
+Deploy	Set up job	2026-03-21T16:49:03.1179412Z ##[group]Operating System
+Deploy	Set up job	2026-03-21T16:49:03.1180139Z Ubuntu
+Deploy	Set up job	2026-03-21T16:49:03.1180654Z 24.04.3
+Deploy	Set up job	2026-03-21T16:49:03.1182162Z LTS
+Deploy	Set up job	2026-03-21T16:49:03.1183092Z ##[endgroup]
+Deploy	Set up job	2026-03-21T16:49:03.1184034Z ##[group]Runner Image
+Deploy	Set up job	2026-03-21T16:49:03.1184999Z Image: ubuntu-24.04
+Deploy	Set up job	2026-03-21T16:49:03.1186057Z Version: 20260309.50.1
+Deploy	Set up job	2026-03-21T16:49:03.1187882Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20260309.50/images/ubuntu/Ubuntu2404-Readme.md
+Deploy	Set up job	2026-03-21T16:49:03.1191049Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20260309.50
+Deploy	Set up job	2026-03-21T16:49:03.1193030Z ##[endgroup]
+Deploy	Set up job	2026-03-21T16:49:03.1195020Z ##[group]GITHUB_TOKEN Permissions
+Deploy	Set up job	2026-03-21T16:49:03.1197587Z Contents: read
+Deploy	Set up job	2026-03-21T16:49:03.1198514Z Metadata: read
+Deploy	Set up job	2026-03-21T16:49:03.1199533Z Packages: read
+Deploy	Set up job	2026-03-21T16:49:03.1200270Z ##[endgroup]
+Deploy	Set up job	2026-03-21T16:49:03.1202627Z Secret source: Actions
+Deploy	Set up job	2026-03-21T16:49:03.1203476Z Prepare workflow directory
+Deploy	Set up job	2026-03-21T16:49:03.1663752Z Prepare all required actions
+Deploy	Set up job	2026-03-21T16:49:03.1718601Z Getting action download info
+Deploy	Set up job	2026-03-21T16:49:03.4732035Z Download action repository 'actions/checkout@v4' (SHA:34e114876b0b11c390a56381ad16ebd13914f8d5)
+Deploy	Set up job	2026-03-21T16:49:03.6328212Z Download action repository 'actions/setup-node@v4' (SHA:49933ea5288caeca8642d1e84afbd3f7d6820020)
+Deploy	Set up job	2026-03-21T16:49:03.8758449Z Complete job name: Deploy
+Deploy	Checkout Code	∩╗┐2026-03-21T16:49:03.9478290Z ##[group]Run actions/checkout@v4
+Deploy	Checkout Code	2026-03-21T16:49:03.9479171Z with:
+Deploy	Checkout Code	2026-03-21T16:49:03.9479639Z   repository: mzurc24/ofw-pesorate
+Deploy	Checkout Code	2026-03-21T16:49:03.9480334Z   token: ***
+Deploy	Checkout Code	2026-03-21T16:49:03.9480744Z   ssh-strict: true
+Deploy	Checkout Code	2026-03-21T16:49:03.9481171Z   ssh-user: git
+Deploy	Checkout Code	2026-03-21T16:49:03.9481607Z   persist-credentials: true
+Deploy	Checkout Code	2026-03-21T16:49:03.9482258Z   clean: true
+Deploy	Checkout Code	2026-03-21T16:49:03.9482686Z   sparse-checkout-cone-mode: true
+Deploy	Checkout Code	2026-03-21T16:49:03.9483212Z   fetch-depth: 1
+Deploy	Checkout Code	2026-03-21T16:49:03.9483630Z   fetch-tags: false
+Deploy	Checkout Code	2026-03-21T16:49:03.9484069Z   show-progress: true
+Deploy	Checkout Code	2026-03-21T16:49:03.9484509Z   lfs: false
+Deploy	Checkout Code	2026-03-21T16:49:03.9484910Z   submodules: false
+Deploy	Checkout Code	2026-03-21T16:49:03.9485341Z   set-safe-directory: true
+Deploy	Checkout Code	2026-03-21T16:49:03.9486037Z ##[endgroup]
+Deploy	Checkout Code	2026-03-21T16:49:04.0608931Z Syncing repository: mzurc24/ofw-pesorate
+Deploy	Checkout Code	2026-03-21T16:49:04.0611108Z ##[group]Getting Git version info
+Deploy	Checkout Code	2026-03-21T16:49:04.0612088Z Working directory is '/home/runner/work/ofw-pesorate/ofw-pesorate'
+Deploy	Checkout Code	2026-03-21T16:49:04.0613159Z [command]/usr/bin/git version
+Deploy	Checkout Code	2026-03-21T16:49:04.0763896Z git version 2.53.0
+Deploy	Checkout Code	2026-03-21T16:49:04.0794139Z ##[endgroup]
+Deploy	Checkout Code	2026-03-21T16:49:04.0810119Z Temporarily overriding HOME='/home/runner/work/_temp/b4736b1d-b836-496b-8457-4d1d82c1b6dd' before making global git config changes
+Deploy	Checkout Code	2026-03-21T16:49:04.0812851Z Adding repository directory to the temporary git global config as a safe directory
+Deploy	Checkout Code	2026-03-21T16:49:04.0827066Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/ofw-pesorate/ofw-pesorate
+Deploy	Checkout Code	2026-03-21T16:49:04.0874606Z Deleting the contents of '/home/runner/work/ofw-pesorate/ofw-pesorate'
+Deploy	Checkout Code	2026-03-21T16:49:04.0878551Z ##[group]Initializing the repository
+Deploy	Checkout Code	2026-03-21T16:49:04.0882881Z [command]/usr/bin/git init /home/runner/work/ofw-pesorate/ofw-pesorate
+Deploy	Checkout Code	2026-03-21T16:49:04.1018705Z hint: Using 'master' as the name for the initial branch. This default branch name
+Deploy	Checkout Code	2026-03-21T16:49:04.1020436Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+Deploy	Checkout Code	2026-03-21T16:49:04.1022306Z hint: to use in all of your new repositories, which will suppress this warning,
+Deploy	Checkout Code	2026-03-21T16:49:04.1023909Z hint: call:
+Deploy	Checkout Code	2026-03-21T16:49:04.1024589Z hint:
+Deploy	Checkout Code	2026-03-21T16:49:04.1025325Z hint: 	git config --global init.defaultBranch <name>
+Deploy	Checkout Code	2026-03-21T16:49:04.1025965Z hint:
+Deploy	Checkout Code	2026-03-21T16:49:04.1026542Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+Deploy	Checkout Code	2026-03-21T16:49:04.1027548Z hint: 'development'. The just-created branch can be renamed via this command:
+Deploy	Checkout Code	2026-03-21T16:49:04.1028311Z hint:
+Deploy	Checkout Code	2026-03-21T16:49:04.1028704Z hint: 	git branch -m <name>
+Deploy	Checkout Code	2026-03-21T16:49:04.1029188Z hint:
+Deploy	Checkout Code	2026-03-21T16:49:04.1030166Z hint: Disable this message with "git config set advice.defaultBranchName false"
+Deploy	Checkout Code	2026-03-21T16:49:04.1031506Z Initialized empty Git repository in /home/runner/work/ofw-pesorate/ofw-pesorate/.git/
+Deploy	Checkout Code	2026-03-21T16:49:04.1036335Z [command]/usr/bin/git remote add origin https://github.com/mzurc24/ofw-pesorate
+Deploy	Checkout Code	2026-03-21T16:49:04.1077331Z ##[endgroup]
+Deploy	Checkout Code	2026-03-21T16:49:04.1078417Z ##[group]Disabling automatic garbage collection
+Deploy	Checkout Code	2026-03-21T16:49:04.1083701Z [command]/usr/bin/git config --local gc.auto 0
+Deploy	Checkout Code	2026-03-21T16:49:04.1119372Z ##[endgroup]
+Deploy	Checkout Code	2026-03-21T16:49:04.1120584Z ##[group]Setting up auth
+Deploy	Checkout Code	2026-03-21T16:49:04.1127096Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+Deploy	Checkout Code	2026-03-21T16:49:04.1162965Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+Deploy	Checkout Code	2026-03-21T16:49:04.1585641Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+Deploy	Checkout Code	2026-03-21T16:49:04.1625729Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+Deploy	Checkout Code	2026-03-21T16:49:04.1875272Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+Deploy	Checkout Code	2026-03-21T16:49:04.1911051Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+Deploy	Checkout Code	2026-03-21T16:49:04.2176304Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+Deploy	Checkout Code	2026-03-21T16:49:04.2215782Z ##[endgroup]
+Deploy	Checkout Code	2026-03-21T16:49:04.2217120Z ##[group]Fetching the repository
+Deploy	Checkout Code	2026-03-21T16:49:04.2226279Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +d05da6810d7abee556648c30a3b18edb877c12d8:refs/remotes/origin/main
+Deploy	Checkout Code	2026-03-21T16:49:04.4485815Z From https://github.com/mzurc24/ofw-pesorate
+Deploy	Checkout Code	2026-03-21T16:49:04.4487332Z  * [new ref]         d05da6810d7abee556648c30a3b18edb877c12d8 -> origin/main
+Deploy	Checkout Code	2026-03-21T16:49:04.4525253Z ##[endgroup]
+Deploy	Checkout Code	2026-03-21T16:49:04.4526584Z ##[group]Determining the checkout info
+Deploy	Checkout Code	2026-03-21T16:49:04.4528182Z ##[endgroup]
+Deploy	Checkout Code	2026-03-21T16:49:04.4533306Z [command]/usr/bin/git sparse-checkout disable
+Deploy	Checkout Code	2026-03-21T16:49:04.4578263Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+Deploy	Checkout Code	2026-03-21T16:49:04.4606680Z ##[group]Checking out the ref
+Deploy	Checkout Code	2026-03-21T16:49:04.4610267Z [command]/usr/bin/git checkout --progress --force -B main refs/remotes/origin/main
+Deploy	Checkout Code	2026-03-21T16:49:04.4667219Z Switched to a new branch 'main'
+Deploy	Checkout Code	2026-03-21T16:49:04.4670502Z branch 'main' set up to track 'origin/main'.
+Deploy	Checkout Code	2026-03-21T16:49:04.4677253Z ##[endgroup]
+Deploy	Checkout Code	2026-03-21T16:49:04.4713739Z [command]/usr/bin/git log -1 --format=%H
+Deploy	Checkout Code	2026-03-21T16:49:04.4737565Z d05da6810d7abee556648c30a3b18edb877c12d8
+Deploy	Setup Node.js	∩╗┐2026-03-21T16:49:04.4988722Z ##[group]Run actions/setup-node@v4
+Deploy	Setup Node.js	2026-03-21T16:49:04.4989287Z with:
+Deploy	Setup Node.js	2026-03-21T16:49:04.4989671Z   node-version: 20
+Deploy	Setup Node.js	2026-03-21T16:49:04.4990086Z   always-auth: false
+Deploy	Setup Node.js	2026-03-21T16:49:04.4990508Z   check-latest: false
+Deploy	Setup Node.js	2026-03-21T16:49:04.4991096Z   token: ***
+Deploy	Setup Node.js	2026-03-21T16:49:04.4991492Z ##[endgroup]
+Deploy	Setup Node.js	2026-03-21T16:49:04.6784746Z Found in cache @ /opt/hostedtoolcache/node/20.20.1/x64
+Deploy	Setup Node.js	2026-03-21T16:49:04.6790820Z ##[group]Environment details
+Deploy	Setup Node.js	2026-03-21T16:49:05.0627218Z node: v20.20.1
+Deploy	Setup Node.js	2026-03-21T16:49:05.0628832Z npm: 10.8.2
+Deploy	Setup Node.js	2026-03-21T16:49:05.0629664Z yarn: 1.22.22
+Deploy	Setup Node.js	2026-03-21T16:49:05.0630622Z ##[endgroup]
+Deploy	Install Dependencies	∩╗┐2026-03-21T16:49:05.0746099Z ##[group]Run npm ci
+Deploy	Install Dependencies	2026-03-21T16:49:05.0746690Z [36;1mnpm ci[0m
+Deploy	Install Dependencies	2026-03-21T16:49:05.0810633Z shell: /usr/bin/bash -e {0}
+Deploy	Install Dependencies	2026-03-21T16:49:05.0811206Z ##[endgroup]
+Deploy	Install Dependencies	2026-03-21T16:49:06.5142808Z npm warn deprecated rollup-plugin-inject@3.0.2: This package has been deprecated and is no longer maintained. Please use @rollup/plugin-inject.
+Deploy	Install Dependencies	2026-03-21T16:49:06.5404221Z npm warn deprecated sourcemap-codec@1.4.8: Please use @jridgewell/sourcemap-codec instead
+Deploy	Install Dependencies	2026-03-21T16:49:10.2970753Z 
+Deploy	Install Dependencies	2026-03-21T16:49:10.2972055Z added 59 packages, and audited 60 packages in 5s
+Deploy	Install Dependencies	2026-03-21T16:49:10.2972870Z 
+Deploy	Install Dependencies	2026-03-21T16:49:10.2973319Z 6 packages are looking for funding
+Deploy	Install Dependencies	2026-03-21T16:49:10.2974146Z   run `npm fund` for details
+Deploy	Install Dependencies	2026-03-21T16:49:10.3643021Z 
+Deploy	Install Dependencies	2026-03-21T16:49:10.3643911Z 4 vulnerabilities (3 moderate, 1 high)
+Deploy	Install Dependencies	2026-03-21T16:49:10.3644436Z 
+Deploy	Install Dependencies	2026-03-21T16:49:10.3645071Z To address all issues (including breaking changes), run:
+Deploy	Install Dependencies	2026-03-21T16:49:10.3645880Z   npm audit fix --force
+Deploy	Install Dependencies	2026-03-21T16:49:10.3646262Z 
+Deploy	Install Dependencies	2026-03-21T16:49:10.3646629Z Run `npm audit` for details.
+Deploy	Deploy to Cloudflare Pages	∩╗┐2026-03-21T16:49:10.3896925Z ##[group]Run npx wrangler pages deploy public --project-name=ofw-pesorate --branch=main
+Deploy	Deploy to Cloudflare Pages	2026-03-21T16:49:10.3897726Z [36;1mnpx wrangler pages deploy public --project-name=ofw-pesorate --branch=main[0m
+Deploy	Deploy to Cloudflare Pages	2026-03-21T16:49:10.3951488Z shell: /usr/bin/bash -e {0}
+Deploy	Deploy to Cloudflare Pages	2026-03-21T16:49:10.3952226Z env:
+Deploy	Deploy to Cloudflare Pages	2026-03-21T16:49:10.3952997Z   CLOUDFLARE_API_TOKEN: ***
+Deploy	Deploy to Cloudflare Pages	2026-03-21T16:49:10.3953515Z   CLOUDFLARE_ACCOUNT_ID: ***
+Deploy	Deploy to Cloudflare Pages	2026-03-21T16:49:10.3953826Z ##[endgroup]
+Deploy	Deploy to Cloudflare Pages	2026-03-21T16:49:11.3563535Z 
+Deploy	Deploy to Cloudflare Pages	2026-03-21T16:49:11.4067786Z [31mΓ£ÿ [41;31m[[41;97mERROR[41;31m][0m [1mA request to the Cloudflare API (/accounts/***/pages/projects/ofw-pesorate) failed.[0m
+Deploy	Deploy to Cloudflare Pages	2026-03-21T16:49:11.4069032Z 
+Deploy	Deploy to Cloudflare Pages	2026-03-21T16:49:11.4070538Z   Could not route to /client/v4/accounts/***/pages/projects/ofw-pesorate, perhaps your object identifier is invalid? [code: 7003]
+Deploy	Deploy to Cloudflare Pages	2026-03-21T16:49:11.4071555Z   
+Deploy	Deploy to Cloudflare Pages	2026-03-21T16:49:11.4072827Z   If you think this is a bug, please open an issue at: [4mhttps://github.com/cloudflare/workers-sdk/issues/new/choose[0m
+Deploy	Deploy to Cloudflare Pages	2026-03-21T16:49:11.4073531Z 
+Deploy	Deploy to Cloudflare Pages	2026-03-21T16:49:11.4073556Z 
+Deploy	Deploy to Cloudflare Pages	2026-03-21T16:49:11.4217834Z ≡ƒ¬╡  Logs were written to "/home/runner/.config/.wrangler/logs/wrangler-2026-03-21_16-49-11_142.log"
+Deploy	Deploy to Cloudflare Pages	2026-03-21T16:49:11.4636182Z ##[error]Process completed with exit code 1.
+Deploy	Post Checkout Code	∩╗┐2026-03-21T16:49:11.4830093Z Post job cleanup.
+Deploy	Post Checkout Code	2026-03-21T16:49:11.5804882Z [command]/usr/bin/git version
+Deploy	Post Checkout Code	2026-03-21T16:49:11.5844008Z git version 2.53.0
+Deploy	Post Checkout Code	2026-03-21T16:49:11.5889542Z Temporarily overriding HOME='/home/runner/work/_temp/a8d422dc-5b4b-44a6-9f36-ba14fdab7068' before making global git config changes
+Deploy	Post Checkout Code	2026-03-21T16:49:11.5891207Z Adding repository directory to the temporary git global config as a safe directory
+Deploy	Post Checkout Code	2026-03-21T16:49:11.5896684Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/ofw-pesorate/ofw-pesorate
+Deploy	Post Checkout Code	2026-03-21T16:49:11.5937369Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+Deploy	Post Checkout Code	2026-03-21T16:49:11.5973649Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+Deploy	Post Checkout Code	2026-03-21T16:49:11.6223094Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+Deploy	Post Checkout Code	2026-03-21T16:49:11.6247916Z http.https://github.com/.extraheader
+Deploy	Post Checkout Code	2026-03-21T16:49:11.6262088Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+Deploy	Post Checkout Code	2026-03-21T16:49:11.6296619Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+Deploy	Post Checkout Code	2026-03-21T16:49:11.6553971Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+Deploy	Post Checkout Code	2026-03-21T16:49:11.6590041Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+Deploy	Complete job	∩╗┐2026-03-21T16:49:11.6955102Z Cleaning up orphan processes
+Deploy	Complete job	2026-03-21T16:49:11.7270781Z ##[warning]Node.js 20 actions are deprecated. The following actions are running on Node.js 20 and may not work as expected: actions/checkout@v4, actions/setup-node@v4. Actions will be forced to run with Node.js 24 by default starting June 2nd, 2026. Please check if updated versions of these actions are available that support Node.js 24. To opt into Node.js 24 now, set the FORCE_JAVASCRIPT_ACTIONS_TO_NODE24=true environment variable on the runner or in your workflow file. Once Node.js 24 becomes the default, you can temporarily opt out by setting ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

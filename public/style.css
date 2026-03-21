@@ -87,6 +87,7 @@ h1 {
     margin-bottom: 8px;
     background: linear-gradient(to right, #ffffff, #93c5fd);
     -webkit-background-clip: text;
+    background-clip: text;
     -webkit-text-fill-color: transparent;
 }
 
@@ -176,18 +177,63 @@ input[type="text"]:focus {
     margin-bottom: 24px;
 }
 
-.currency-pair {
-    font-size: 1.1rem;
-    color: var(--text-secondary);
-    margin-bottom: 12px;
+.rate-value-container {
+    display: flex;
+    justify-content: center;
+    align-items: baseline;
+    gap: 8px;
+}
+
+.symbol {
+    font-size: 1.5rem;
     font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: 8px;
 }
 
 .rate-value {
-    font-size: 3rem;
+    font-size: 3.5rem;
     font-weight: 700;
     color: #fff;
     letter-spacing: -1px;
+}
+
+.selector-group {
+    margin-bottom: 20px;
+}
+
+.currency-select {
+    width: 100%;
+    padding: 12px 16px;
+    border-radius: 12px;
+    border: 1px solid var(--glass-border);
+    background: rgba(0, 0, 0, 0.3);
+    color: white;
+    font-size: 1rem;
+    font-family: inherit;
+    outline: none;
+    cursor: pointer;
+    transition: all 0.2s;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='white'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 16px center;
+    background-size: 16px;
+}
+
+.currency-select:hover {
+    background-color: rgba(255, 255, 255, 0.05);
+    border-color: var(--accent);
+}
+
+.currency-select:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
+}
+
+.currency-select option {
+    background: var(--bg-dark);
+    color: white;
 }
 
 .action-footer {

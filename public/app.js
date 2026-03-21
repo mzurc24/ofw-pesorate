@@ -6,12 +6,15 @@ document.addEventListener('DOMContentLoaded', () => {
     
     const greetingEl = document.getElementById('greeting');
     const currencyPairEl = document.getElementById('currency-pair');
+    const currencySelect = document.getElementById('currency-select');
     const rateValueEl = document.getElementById('rate-value');
+    const targetSymbolEl = document.getElementById('target-symbol');
     const lastUpdatedEl = document.getElementById('last-updated');
     const refreshBtn = document.getElementById('refresh-btn');
 
     let userName = localStorage.getItem('ofw_pesorate_name');
     let userId = localStorage.getItem('ofw_pesorate_id');
+    let selectedCurrency = localStorage.getItem('ofw_pesorate_currency');
 
     if (!userId) {
         userId = crypto.randomUUID();
@@ -23,6 +26,16 @@ document.addEventListener('DOMContentLoaded', () => {
     } else {
         showDashboard(userName);
     }
+
+    if (selectedCurrency) {
+        currencySelect.value = selectedCurrency;
+    }
+
+    currencySelect.addEventListener('change', () => {
+        selectedCurrency = currencySelect.value;
+        localStorage.setItem('ofw_pesorate_currency', selectedCurrency);
+        fetchRate(userName, userId, true);
+    });
 
     saveNameBtn.addEventListener('click', () => {
         const name = nameInput.value.trim();
@@ -64,7 +77,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         try {
-            const res = await fetch('/api/rate', {
+            const url = new URL('/api/rate', window.location.origin);
+            if (selectedCurrency) {
+                url.searchParams.set('currency', selectedCurrency);
+            }
+
+            const res = await fetch(url, {
                 headers: {
                     'x-user-id': id,
                     'x-user-name': encodeURIComponent(name)
@@ -75,15 +93,21 @@ document.addEventListener('DOMContentLoaded', () => {
             
             const data = await res.json();
             
-            if (data.country) {
-                const flag = getFlagEmoji(data.country);
-                greetingEl.textContent = `Hello ${name} ${flag}`;
+            // If no currency was selected yet, use the one detected by API
+            if (!selectedCurrency) {
+                selectedCurrency = data.from_currency;
+                currencySelect.value = selectedCurrency;
+                localStorage.setItem('ofw_pesorate_currency', selectedCurrency);
             }
 
-            currencyPairEl.innerHTML = `${data.from_currency} &rarr; ${data.to_currency}`;
+            const flag = getFlagEmoji(data.country);
+            greetingEl.textContent = `Hello ${name} ${flag}`;
+
+            currencyPairEl.innerHTML = `1 ${data.from_currency} &rarr; 1 ${data.to_currency}`;
             rateValueEl.textContent = Number(data.rate).toFixed(2);
-            lastUpdatedEl.textContent = `Updated: ${new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
+            targetSymbolEl.textContent = data.symbol || '$';
             
+            lastUpdatedEl.textContent = `Updated: ${new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
             rateValueEl.style.opacity = '1';
 
         } catch (error) {

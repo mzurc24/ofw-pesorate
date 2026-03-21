@@ -33,8 +33,40 @@
                 <p class="subtitle">Here's your real-time rate today</p>
                 
                 <div class="rate-card">
-                    <div class="currency-pair" id="currency-pair">--- &rarr; PHP</div>
-                    <div class="rate-value" id="rate-value">Loading...</div>
+                    <div class="selector-group">
+                        <select id="currency-select" class="currency-select">
+                            <option value="PHP">₱ PHP (Philippine Peso)</option>
+                            <option value="SAR">﷼ SAR (Saudi Arabia)</option>
+                            <option value="AED">د.إ AED (United Arab Emirates)</option>
+                            <option value="QAR">﷼ QAR (Qatar)</option>
+                            <option value="KWD">د.ك KWD (Kuwait)</option>
+                            <option value="OMR">﷼ OMR (Oman)</option>
+                            <option value="BHD">.د.ب BHD (Bahrain)</option>
+                            <option value="GBP">£ GBP (United Kingdom)</option>
+                            <option value="EUR">€ EUR (Euro Zone)</option>
+                            <option value="CHF">CHF (Switzerland)</option>
+                            <option value="NOK">kr NOK (Norway)</option>
+                            <option value="SEK">kr SEK (Sweden)</option>
+                            <option value="SGD">$ SGD (Singapore)</option>
+                            <option value="HKD">$ HKD (Hong Kong)</option>
+                            <option value="MYR">RM MYR (Malaysia)</option>
+                            <option value="TWD">NT$ TWD (Taiwan)</option>
+                            <option value="JPY">¥ JPY (Japan)</option>
+                            <option value="KRW">₩ KRW (South Korea)</option>
+                            <option value="CNY">¥ CNY (China)</option>
+                            <option value="THB">฿ THB (Thailand)</option>
+                            <option value="USD">$ USD (United States)</option>
+                            <option value="CAD">$ CAD (Canada)</option>
+                            <option value="MXN">$ MXN (Mexico)</option>
+                            <option value="AUD">$ AUD (Australia)</option>
+                            <option value="NZD">$ NZD (New Zealand)</option>
+                        </select>
+                    </div>
+                    <div class="currency-pair" id="currency-pair">1 --- &rarr; 1 PHP</div>
+                    <div class="rate-value-container">
+                        <span class="symbol" id="target-symbol">₱</span>
+                        <span class="rate-value" id="rate-value">0.00</span>
+                    </div>
                 </div>
                 
                 <div class="action-footer">
