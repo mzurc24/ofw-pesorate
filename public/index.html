@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zero-Cost Currency Platform</title>
+    <meta name="description" content="Automatic, fast, and responsive currency conversion to PHP">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="background">
+        <div class="blob blob-1"></div>
+        <div class="blob blob-2"></div>
+        <div class="blob blob-3"></div>
+    </div>
+
+    <main class="container">
+        <div class="glass-panel" id="main-panel">
+            <!-- First Visit Prompt -->
+            <div id="first-visit" class="hidden">
+                <h1>Welcome to Pesorate</h1>
+                <p>What should we call you?</p>
+                <div class="input-group">
+                    <input type="text" id="name-input" placeholder="Your name" autocomplete="off">
+                    <button class="btn" id="save-name-btn">Continue</button>
+                </div>
+            </div>
+
+            <!-- Conversion Dashboard -->
+            <div id="dashboard" class="hidden fade-in">
+                <h1 id="greeting">Hello</h1>
+                <p class="subtitle">Here's your real-time rate today</p>
+                
+                <div class="rate-card">
+                    <div class="currency-pair" id="currency-pair">--- &rarr; PHP</div>
+                    <div class="rate-value" id="rate-value">Loading...</div>
+                </div>
+                
+                <div class="action-footer">
+                    <p class="last-updated" id="last-updated">Updating live...</p>
+                    <button class="btn btn-secondary" id="refresh-btn">Refresh</button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="app.js"></script>
+</body>
+</html>

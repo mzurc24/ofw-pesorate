@@ -1,0 +1,12 @@
+{
+  "name": "ofw-pesorate",
+  "version": "1.0.0",
+  "description": "Zero-Cost Currency Conversion Platform",
+  "scripts": {
+    "dev": "wrangler pages dev public --local --d1 DB=c1e1c1e1-c1e1-c1e1-c1e1-c1e1c1e1c1e1",
+    "deploy": "wrangler pages deploy public"
+  },
+  "devDependencies": {
+    "wrangler": "^3.0.0"
+  }
+}

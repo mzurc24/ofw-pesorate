@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard | Pesorate</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .container {
+            max-width: 800px;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .stat-card {
+            background: rgba(0,0,0,0.2);
+            border: 1px solid var(--glass-border);
+            padding: 20px;
+            border-radius: 16px;
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--accent);
+            margin-top: 10px;
+        }
+        .chart-container {
+            background: rgba(0,0,0,0.2);
+            border: 1px solid var(--glass-border);
+            padding: 20px;
+            border-radius: 16px;
+            margin-bottom: 30px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid var(--glass-border);
+        }
+        th {
+            color: var(--text-secondary);
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <div class="background">
+        <div class="blob blob-1"></div>
+        <div class="blob blob-2"></div>
+        <div class="blob blob-3"></div>
+    </div>
+
+    <main class="container">
+        <div class="glass-panel" id="login-panel">
+            <h1>Admin Access</h1>
+            <p class="subtitle">Enter your secret token</p>
+            <div class="input-group">
+                <input type="password" id="token-input" placeholder="Secret Token">
+                <button class="btn" id="login-btn">Access Dashboard</button>
+            </div>
+            <p id="login-error" style="color: #ef4444; margin-top: 10px;" class="hidden">Invalid Token</p>
+        </div>
+
+        <div class="glass-panel hidden fade-in" id="dashboard-panel">
+            <h1>Platform Overview</h1>
+            <p class="subtitle">Conversions from last 7 days</p>
+
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div>New Users (7d)</div>
+                    <div class="stat-value" id="stat-users">0</div>
+                </div>
+                <div class="stat-card">
+                    <div>Total Conversions (7d)</div>
+                    <div class="stat-value" id="stat-conversions">0</div>
+                </div>
+            </div>
+
+            <div class="chart-container">
+                <canvas id="dailyChart" width="400" height="200"></canvas>
+            </div>
+
+            <div class="chart-container">
+                <h3>Popular Currency Pairs</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Pair</th>
+                            <th>Conversions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="pairs-table">
+                        <!-- Populated by JS -->
+                    </tbody>
+                </table>
+            </div>
+            <button class="btn btn-secondary" style="width:100%" id="refresh-btn">Refresh Data</button>
+        </div>
+    </main>
+    <script src="admin.js"></script>
+</body>
+</html>
