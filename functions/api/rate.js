@@ -1,8 +1,10 @@
 const COUNTRY_CURRENCY_MAP = {
-    'SG': 'SGD', 'US': 'USD', 'AE': 'AED', 'SA': 'SAR', 'QA': 'QAR', 
-    'GB': 'GBP', 'CA': 'CAD', 'AU': 'AUD', 'JP': 'JPY', 'HK': 'HKD',
-    'MO': 'MOP', 'KR': 'KRW', 'TW': 'TWD', 'MY': 'MYR', 'BN': 'BND',
-    'NZ': 'NZD', 'IT': 'EUR', 'ES': 'EUR', 'FR': 'EUR', 'DE': 'EUR',
+    'SA': 'SAR', 'AE': 'AED', 'QA': 'QAR', 'KW': 'KWD', 'OM': 'OMR',
+    'BH': 'BHD', 'GB': 'GBP', 'IT': 'EUR', 'ES': 'EUR', 'DE': 'EUR',
+    'FR': 'EUR', 'NL': 'EUR', 'CH': 'CHF', 'NO': 'NOK', 'SE': 'SEK',
+    'SG': 'SGD', 'HK': 'HKD', 'MY': 'MYR', 'TW': 'TWD', 'JP': 'JPY',
+    'KR': 'KRW', 'CN': 'CNY', 'TH': 'THB', 'US': 'USD', 'CA': 'CAD',
+    'MX': 'MXN', 'AU': 'AUD', 'NZ': 'NZD',
     'PH': 'USD' // Default to USD per requirements for inside PH
 };
 
