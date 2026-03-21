@@ -91,8 +91,13 @@ document.addEventListener('DOMContentLoaded', () => {
             
             if (!res.ok) throw new Error('API Error');
             
-            const data = await res.json();
-            
+            // Show/Hide selector based on location (requirements)
+            if (data.country === 'PH') {
+                currencySelect.parentElement.classList.remove('hidden');
+            } else {
+                currencySelect.parentElement.classList.add('hidden');
+            }
+
             // If no currency was selected yet, use the one detected by API
             if (!selectedCurrency) {
                 selectedCurrency = data.from_currency;
