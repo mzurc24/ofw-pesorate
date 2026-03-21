@@ -14,7 +14,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let userName = localStorage.getItem('ofw_pesorate_name');
     let userId = localStorage.getItem('ofw_pesorate_id');
-    let selectedCurrency = localStorage.getItem('ofw_pesorate_currency');
+    // selectedCurrency starts null — backend decides on first load
+    // We only apply a saved preference AFTER confirming user is in PH
+    let selectedCurrency = null;
+    let userCountry = null; // Set after first API response
 
     if (!userId) {
         userId = crypto.randomUUID();
@@ -27,11 +30,11 @@ document.addEventListener('DOMContentLoaded', () => {
         showDashboard(userName);
     }
 
-    if (selectedCurrency) {
-        currencySelect.value = selectedCurrency;
-    }
+    // Don't pre-set the selector — wait for backend response
 
     currencySelect.addEventListener('change', () => {
+        // Only PH users can switch — double-check before applying
+        if (userCountry !== 'PH') return;
         selectedCurrency = currencySelect.value;
         localStorage.setItem('ofw_pesorate_currency', selectedCurrency);
         fetchRate(userName, userId, true);
@@ -78,41 +81,67 @@ document.addEventListener('DOMContentLoaded', () => {
 
         try {
             const url = new URL('/api/rate', window.location.origin);
-            if (selectedCurrency) {
+
+            // ── Currency param rules ───────────────────────────────────────
+            // ONLY send ?currency if the user is confirmed PH and has chosen one.
+            // On first load (userCountry not yet known), send nothing and let backend decide.
+            if (userCountry === 'PH' && selectedCurrency) {
                 url.searchParams.set('currency', selectedCurrency);
             }
+            // Non-PH users: never override — backend geo is the source of truth
 
             const res = await fetch(url, {
                 headers: {
                     'x-user-id': id,
-                    'x-user-name': encodeURIComponent(name)
+                    'x-user-name': encodeURIComponent(name || '')
                 }
             });
-            
+
             if (!res.ok) throw new Error('API Error');
-            
-            // Show/Hide selector based on location (requirements)
-            if (data.country === 'PH') {
+
+            const data = await res.json();
+
+            // ── Update known country from backend ─────────────────────────
+            userCountry = data.country;
+            const isLocked = data.currency_locked !== false; // true unless explicitly false
+
+            // ── Show/Hide switcher strictly by backend rule ───────────────
+            if (!isLocked) {
+                // PH user — apply saved preference, show switcher
                 currencySelect.parentElement.classList.remove('hidden');
+                currencySelect.disabled = false;
+
+                // Load PH user's saved preference now that we know they are PH
+                if (!selectedCurrency) {
+                    const saved = localStorage.getItem('ofw_pesorate_currency');
+                    if (saved && saved !== 'USD') {
+                        selectedCurrency = saved;
+                    } else {
+                        selectedCurrency = data.from_currency;
+                    }
+                    currencySelect.value = selectedCurrency;
+                    // Re-fetch with the actual currency preference
+                    if (selectedCurrency !== data.from_currency) {
+                        return fetchRate(name, id, false);
+                    }
+                }
             } else {
+                // Non-PH — clear any stale localStorage currency and lock UI
+                localStorage.removeItem('ofw_pesorate_currency');
+                selectedCurrency = null;
                 currencySelect.parentElement.classList.add('hidden');
+                currencySelect.disabled = true;
             }
 
-            // If no currency was selected yet, use the one detected by API
-            if (!selectedCurrency) {
-                selectedCurrency = data.from_currency;
-                currencySelect.value = selectedCurrency;
-                localStorage.setItem('ofw_pesorate_currency', selectedCurrency);
-            }
-
+            // ── Render ────────────────────────────────────────────────────
             const flag = getFlagEmoji(data.country);
             greetingEl.textContent = `Hello ${name} ${flag}`;
 
             currencyPairEl.innerHTML = `1 ${data.from_currency} &rarr; 1 ${data.to_currency}`;
             rateValueEl.textContent = Number(data.rate).toFixed(2);
-            targetSymbolEl.textContent = data.symbol || '$';
-            
-            lastUpdatedEl.textContent = `Updated: ${new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
+            targetSymbolEl.textContent = data.symbol || '';
+
+            lastUpdatedEl.textContent = `Updated: ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
             rateValueEl.style.opacity = '1';
 
         } catch (error) {
