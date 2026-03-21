@@ -1,5 +1,4 @@
 node_modules/
 .wrangler/
-package-lock.json
 error.txt
 error-utf8.txt
