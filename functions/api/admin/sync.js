@@ -16,6 +16,7 @@ async function safeDbRun(env, query, ...params) {
 }
 
 export async function onRequest(context) {
+    const { request, env } = context;
     // 1. Security Check
     const url = new URL(request.url);
     const rawToken = url.searchParams.get('token') || request.headers.get('Authorization')?.replace('Bearer ', '');
