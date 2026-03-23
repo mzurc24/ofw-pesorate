@@ -42,7 +42,10 @@ export async function onRequest(context) {
 
     // 1. Security Check
     const token = authHeader?.replace('Bearer ', '');
-    if (!token || token !== (env.CF_ADMIN_TOKEN || 'ofwAk026')) {
+    const queryToken = new URL(request.url).searchParams.get('token');
+    const validToken = env.CF_ADMIN_TOKEN || 'ofwAk026';
+
+    if ((!token || token !== validToken) && (!queryToken || queryToken !== validToken)) {
         return new Response(JSON.stringify({ status: 'error', message: 'Unauthorized' }), {
             status: 401,
             headers: { 'Content-Type': 'application/json' }
