@@ -85,34 +85,19 @@ export async function onRequest(context) {
         `, crypto.randomUUID(), userId, baseCurrency, targetCurrency, 1, nowStamp));
     }
 
-    // 3. Data Retrieval Strategy (KV Cache -> D1 Cache -> Fallback)
+    // 3. Data Retrieval Strategy (D1 Cache -> Fallback)
     let rates = null;
     let strategyUsed = 'fallback';
 
     try {
-        // Step A: Attempt KV CACHE (Primary daily source)
-        if (env.KV) {
-            const kvCache = await env.KV.get("rates_cache", { type: "json" });
-            if (kvCache && kvCache.rates) {
-                rates = kvCache.rates;
-                strategyUsed = 'kv_cache';
-            }
+        // Step A: Attempt D1 CACHE (Primary daily source)
+        const cacheRecord = await safeDbQuery(env, `SELECT rates_json FROM rates_cache WHERE base_currency = 'EUR'`);
+        if (cacheRecord?.rates_json) {
+            rates = JSON.parse(cacheRecord.rates_json);
+            strategyUsed = 'd1_cache';
         }
     } catch (e) {
-        console.error('KV Retrieval failed:', e);
-    }
-
-    if (!rates) {
-        try {
-            // Step B: Attempt D1 CACHE (Legacy/Fallback)
-            const cacheRecord = await safeDbQuery(env, `SELECT rates_json FROM rates_cache WHERE base_currency = 'EUR'`);
-            if (cacheRecord?.rates_json) {
-                rates = JSON.parse(cacheRecord.rates_json);
-                strategyUsed = 'd1_cache';
-            }
-        } catch (e) {
-            console.error('D1 Cache Retrieval failed:', e);
-        }
+        console.error('D1 Cache Retrieval failed:', e);
     }
 
     if (!rates) {

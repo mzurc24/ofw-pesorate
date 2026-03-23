@@ -29,11 +29,11 @@ export async function onRequest(context) {
     }
 
     // 2. Throttling Check (1 call per 24h)
-    const lastFetch = await env.KV.get("last_fetch");
-    const now = Date.now();
     const CACHE_TTL = 86400;
+    const lastFetchRow = await env.DB.prepare("SELECT value FROM settings WHERE key = 'last_fixer_fetch'").first();
+    const now = Date.now();
 
-    if (lastFetch && (now - parseInt(lastFetch)) / 1000 < CACHE_TTL) {
+    if (lastFetchRow && (now - parseInt(lastFetchRow.value)) / 1000 < CACHE_TTL) {
         return new Response(JSON.stringify({
             status: 'error',
             message: 'Sync already performed within the last 24 hours. Rate limit safety active.'
@@ -58,23 +58,13 @@ export async function onRequest(context) {
 
         const ratesJson = JSON.stringify(data.rates);
 
-        // 4. Update KV and D1 Cache
-        if (env.KV) {
-            await env.KV.put("rates_cache", JSON.stringify(data), { expirationTtl: CACHE_TTL });
-            await env.KV.put("last_fetch", now.toString());
-        }
-
+        // 4. Update D1 Cache
         if (env.DB) {
-            await safeDbRun(env, `
-                INSERT INTO rates_cache (base_currency, rates_json, updated_at)
-                VALUES ('EUR', ?, ?)
-                ON CONFLICT(base_currency) DO UPDATE SET
-                    rates_json = EXCLUDED.rates_json,
-                    updated_at = EXCLUDED.updated_at
-            `, ratesJson, now);
-            
-            // Log to api_logs
-            await env.DB.prepare("INSERT INTO api_logs (endpoint, status) VALUES (?, ?)").bind("/api/admin/sync", "success").run();
+            await env.DB.batch([
+                env.DB.prepare("INSERT INTO rates_cache (base_currency, rates_json, updated_at) VALUES ('EUR', ?, ?) ON CONFLICT(base_currency) DO UPDATE SET rates_json = excluded.rates_json, updated_at = excluded.updated_at").bind(ratesJson, now),
+                env.DB.prepare("INSERT INTO settings (key, value) VALUES ('last_fixer_fetch', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").bind(now.toString()),
+                env.DB.prepare("INSERT INTO api_logs (endpoint, status) VALUES (?, ?)").bind("/api/admin/sync", "success")
+            ]);
         }
 
         return new Response(JSON.stringify({
