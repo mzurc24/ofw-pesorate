@@ -68,12 +68,30 @@ export async function onRequest(context) {
 
     if (env.DB) {
         try {
-            // Core rates data
-            const cacheRow = await env.DB.prepare("SELECT rates_json, updated_at FROM rates_cache WHERE base_currency = 'EUR'").first();
+            // Core rates data from KV (New Primary) or D1 (Fallback)
+            let ratesRow = null;
+            let cacheSource = 'unknown';
+
+            if (env.KV) {
+                const kvData = await env.KV.get("rates_cache", { type: "json" });
+                if (kvData && kvData.rates) {
+                    ratesRow = { rates_json: JSON.stringify(kvData.rates), updated_at: parseInt(await env.KV.get("last_fetch") || "0") };
+                    cacheSource = 'kv';
+                }
+            }
+
+            if (!ratesRow) {
+                const dbRow = await env.DB.prepare("SELECT rates_json, updated_at FROM rates_cache WHERE base_currency = 'EUR'").first();
+                if (dbRow) {
+                    ratesRow = dbRow;
+                    cacheSource = 'd1';
+                }
+            }
+
             dbStatus = 'healthy';
 
-            if (cacheRow) {
-                const allRates = JSON.parse(cacheRow.rates_json);
+            if (ratesRow) {
+                const allRates = JSON.parse(ratesRow.rates_json);
                 const eurToPhp = allRates['PHP'] || 1;
 
                 SUPPORTED_COUNTRIES.forEach(c => {
@@ -81,14 +99,14 @@ export async function onRequest(context) {
                     rates[`${c.currency}_PHP`] = parseFloat((eurToPhp / eurToCur).toFixed(4));
                 });
 
-                lastUpdated = new Date(cacheRow.updated_at).toISOString();
-                strategy = 'cache';
+                lastUpdated = new Date(ratesRow.updated_at).toISOString();
+                strategy = cacheSource;
 
-                // Check if rates are stale (>6 hours)
-                const ageMs = Date.now() - cacheRow.updated_at;
-                if (ageMs < 6 * 60 * 60 * 1000) {
+                // Check if rates are stale (>24 hours for daily sync)
+                const ageMs = Date.now() - ratesRow.updated_at;
+                if (ageMs < 24 * 60 * 60 * 1000) {
                     apiStatus = 'healthy';
-                } else if (ageMs < 24 * 60 * 60 * 1000) {
+                } else if (ageMs < 48 * 60 * 60 * 1000) {
                     apiStatus = 'degraded';
                 } else {
                     apiStatus = 'down';

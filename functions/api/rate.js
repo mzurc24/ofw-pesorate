@@ -85,45 +85,33 @@ export async function onRequest(context) {
         `, crypto.randomUUID(), userId, baseCurrency, targetCurrency, 1, nowStamp));
     }
 
-    // 3. Data Retrieval Strategy (Live -> Cache -> Fallback)
+    // 3. Data Retrieval Strategy (KV Cache -> D1 Cache -> Fallback)
     let rates = null;
     let strategyUsed = 'fallback';
 
     try {
-        // Step A: Attempt LIVE API
-        const apiKey = env.CF_FIXER_KEY || '566e5ce2bbb50f23733c34b6b07146b2';
-        const fixerRes = await fetch(`http://data.fixer.io/api/latest?access_key=${apiKey}`);
-        if (fixerRes.ok) {
-            const fixerData = await fixerRes.json();
-            if (fixerData.success && fixerData.rates) {
-                rates = fixerData.rates;
-                strategyUsed = 'live';
-
-                // Update Cache (Background)
-                if (env.DB) {
-                    waitUntil(safeDbRun(env, `
-                        INSERT INTO rates_cache (base_currency, rates_json, updated_at)
-                        VALUES ('EUR', ?, ?)
-                        ON CONFLICT(base_currency) DO UPDATE SET 
-                        rates_json = excluded.rates_json, updated_at = excluded.updated_at
-                    `, JSON.stringify(rates), nowStamp));
-                }
+        // Step A: Attempt KV CACHE (Primary daily source)
+        if (env.KV) {
+            const kvCache = await env.KV.get("rates_cache", { type: "json" });
+            if (kvCache && kvCache.rates) {
+                rates = kvCache.rates;
+                strategyUsed = 'kv_cache';
             }
         }
     } catch (e) {
-        console.error('Live Fetch failed:', e);
+        console.error('KV Retrieval failed:', e);
     }
 
     if (!rates) {
         try {
-            // Step B: Attempt CACHE
+            // Step B: Attempt D1 CACHE (Legacy/Fallback)
             const cacheRecord = await safeDbQuery(env, `SELECT rates_json FROM rates_cache WHERE base_currency = 'EUR'`);
             if (cacheRecord?.rates_json) {
                 rates = JSON.parse(cacheRecord.rates_json);
-                strategyUsed = 'cache';
+                strategyUsed = 'd1_cache';
             }
         } catch (e) {
-            console.error('Cache Retrieval failed:', e);
+            console.error('D1 Cache Retrieval failed:', e);
         }
     }
 

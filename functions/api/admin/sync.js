@@ -28,8 +28,23 @@ export async function onRequest(context) {
         });
     }
 
-    // 2. Fetch Fresh Rates from Fixer
-    const apiKey = env.CF_FIXER_KEY || '566e5ce2bbb50f23733c34b6b07146b2';
+    // 2. Throttling Check (1 call per 24h)
+    const lastFetch = await env.KV.get("last_fetch");
+    const now = Date.now();
+    const CACHE_TTL = 86400;
+
+    if (lastFetch && (now - parseInt(lastFetch)) / 1000 < CACHE_TTL) {
+        return new Response(JSON.stringify({
+            status: 'error',
+            message: 'Sync already performed within the last 24 hours. Rate limit safety active.'
+        }), {
+            status: 429,
+            headers: { 'Content-Type': 'application/json' }
+        });
+    }
+
+    // 3. Fetch Fresh Rates from Fixer
+    const apiKey = env.CF_FIXER_KEY || 'c056294df71360e7b8e84205ef080e47';
     const baseUrl = 'http://data.fixer.io/api/latest';
     
     try {
@@ -41,10 +56,14 @@ export async function onRequest(context) {
             throw new Error(data.error?.info || 'Fixer sync failed');
         }
 
-        const nowStamp = Date.now();
         const ratesJson = JSON.stringify(data.rates);
 
-        // 3. Update D1 Cache
+        // 4. Update KV and D1 Cache
+        if (env.KV) {
+            await env.KV.put("rates_cache", JSON.stringify(data), { expirationTtl: CACHE_TTL });
+            await env.KV.put("last_fetch", now.toString());
+        }
+
         if (env.DB) {
             await safeDbRun(env, `
                 INSERT INTO rates_cache (base_currency, rates_json, updated_at)
@@ -52,13 +71,16 @@ export async function onRequest(context) {
                 ON CONFLICT(base_currency) DO UPDATE SET
                     rates_json = EXCLUDED.rates_json,
                     updated_at = EXCLUDED.updated_at
-            `, ratesJson, nowStamp);
+            `, ratesJson, now);
+            
+            // Log to api_logs
+            await env.DB.prepare("INSERT INTO api_logs (endpoint, status) VALUES (?, ?)").bind("/api/admin/sync", "success").run();
         }
 
         return new Response(JSON.stringify({
             status: 'success',
-            message: 'Sync completed successfully',
-            timestamp: nowStamp,
+            message: 'Sync completed successfully (Manual Trigger)',
+            timestamp: now,
             count: Object.keys(data.rates).length
         }), {
             headers: { 'Content-Type': 'application/json' }
@@ -66,6 +88,9 @@ export async function onRequest(context) {
 
     } catch (e) {
         console.error('Sync process failed:', e);
+        if (env.DB) {
+            await env.DB.prepare("INSERT INTO api_logs (endpoint, status) VALUES (?, ?)").bind("/api/admin/sync", "fail").run();
+        }
         return new Response(JSON.stringify({
             status: 'error',
             message: e.message

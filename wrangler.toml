@@ -9,4 +9,8 @@ database_id = "51d58731-0d5c-41ad-b056-7d36e29fab0d"
 
 [vars]
 CF_ADMIN_TOKEN = "ofwAk026"
-CF_FIXER_KEY = "566e5ce2bbb50f23733c34b6b07146b2"
+CF_FIXER_KEY = "c056294df71360e7b8e84205ef080e47"
+
+[[kv_namespaces]]
+binding = "KV"
+id = "PLACEHOLDER_KV_ID" # User needs to replace this or it will use local dev KV
