@@ -3,522 +3,438 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OFW PesoRate — Live Currency Converter</title>
-    <meta name="description" content="Real-time currency converter for OFWs. See live exchange rates for 28 countries — always accurate, never an error.">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <title>OFW PesoRate — Zero-Cost Currency Platform</title>
+    <!-- SF Pro Display Fallback -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
-        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
         :root {
-            --bg: #09090b;
-            --surface: #111113;
-            --surface-2: #18181b;
-            --glass: rgba(255,255,255,0.04);
-            --border: rgba(255,255,255,0.08);
-            --border-hover: rgba(255,255,255,0.16);
-            --text-1: #fafafa;
-            --text-2: #a1a1aa;
-            --text-3: #52525b;
-            --accent: #3b82f6;
-            --accent-glow: rgba(59,130,246,0.18);
-            --green: #22c55e;
-            --radius: 16px;
+            --apple-bg: linear-gradient(135deg, #ffffff 0%, #e2e8f0 50%, #cbd5e1 100%);
+            --glass-bg: rgba(255, 255, 255, 0.45);
+            --glass-border: rgba(255, 255, 255, 0.4);
+            --text-primary: #1d1d1f;
+            --text-secondary: #424245; /* Darker for readability over images */
+            --accent: #0071e3;
+            --success: #34c759;
+            --blur: 40px;
+            --radius: 28px;
+            --easing: cubic-bezier(0.22, 1, 0.36, 1);
         }
 
-        html { color-scheme: dark; }
+        * { box-sizing: border-box; margin: 0; padding: 0; -webkit-font-smoothing: antialiased; }
 
         body {
-            font-family: 'Inter', system-ui, sans-serif;
-            background: var(--bg);
-            color: var(--text-1);
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            overflow-x: hidden;
-        }
-
-        /* ── Animated Background ── */
-        .bg-blobs {
-            position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden;
-        }
-        .blob {
-            position: absolute; border-radius: 50%;
-            filter: blur(100px); animation: floatBlob 18s ease-in-out infinite;
-        }
-        .blob-1 { width: 600px; height: 600px; top: -200px; left: -200px; background: radial-gradient(circle, rgba(59,130,246,0.15), transparent 70%); animation-delay: 0s; }
-        .blob-2 { width: 500px; height: 500px; bottom: -150px; right: -100px; background: radial-gradient(circle, rgba(99,102,241,0.12), transparent 70%); animation-delay: -6s; }
-        .blob-3 { width: 400px; height: 400px; top: 40%; left: 50%; background: radial-gradient(circle, rgba(168,85,247,0.08), transparent 70%); animation-delay: -12s; }
-        @keyframes floatBlob {
-            0%,100% { transform: translate(0,0) scale(1); }
-            33%      { transform: translate(30px,-20px) scale(1.05); }
-            66%      { transform: translate(-20px, 25px) scale(0.96); }
-        }
-
-        /* ── First-visit overlay ── */
-        #first-visit-overlay {
-            position: fixed; inset: 0; z-index: 100;
-            background: rgba(9,9,11,0.92);
-            display: flex; align-items: center; justify-content: center;
-            backdrop-filter: blur(8px);
-        }
-        .welcome-card {
-            background: var(--surface);
-            border: 1px solid var(--border-hover);
-            border-radius: 20px;
-            padding: 40px 36px;
-            width: 100%; max-width: 360px;
-            text-align: center;
-        }
-        .welcome-card .logo { font-size: 2.5rem; margin-bottom: 12px; }
-        .welcome-card h2 { font-size: 1.4rem; font-weight: 700; margin-bottom: 8px; }
-        .welcome-card p { font-size: 0.87rem; color: var(--text-2); margin-bottom: 24px; }
-        .welcome-card input {
-            width: 100%; padding: 13px 16px;
-            border-radius: 10px;
-            border: 1.5px solid var(--border);
-            background: var(--surface-2);
-            color: var(--text-1);
-            font-size: 0.95rem; font-family: inherit;
-            outline: none; margin-bottom: 12px; text-align: center;
-            transition: border-color 0.2s, box-shadow 0.2s;
-        }
-        .welcome-card input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
-        .welcome-card button {
-            width: 100%; padding: 13px;
-            border-radius: 10px; border: none;
-            background: linear-gradient(135deg, #3b82f6, #6366f1);
-            color: #fff; font-size: 0.95rem; font-weight: 600; font-family: inherit;
-            cursor: pointer; transition: opacity 0.2s, transform 0.15s;
-            box-shadow: 0 4px 20px rgba(99,102,241,0.28);
-        }
-        .welcome-card button:hover { opacity: 0.9; transform: translateY(-1px); }
-        .welcome-card button:active { transform: scale(0.98); }
-
-        /* ── Main Layout ── */
-        .page {
-            position: relative; z-index: 1;
-            width: 100%; max-width: 540px;
-            padding: 32px 20px 40px;
-            display: flex; flex-direction: column; align-items: center; gap: 0;
-        }
-
-        /* ── Top Nav ── */
-        .top-nav {
-            width: 100%;
-            display: flex; align-items: center; justify-content: space-between;
-            margin-bottom: 28px;
-        }
-        .brand {
-            display: flex; align-items: center; gap: 9px;
-        }
-        .brand-icon {
-            width: 34px; height: 34px; border-radius: 10px;
-            background: linear-gradient(135deg, #3b82f6, #6366f1);
-            display: flex; align-items: center; justify-content: center;
-            font-size: 17px; font-weight: 700;
-            box-shadow: 0 4px 12px rgba(99,102,241,0.3);
-        }
-        .brand-name { font-size: 0.95rem; font-weight: 700; letter-spacing: -0.3px; }
-        .status-chip {
-            display: flex; align-items: center; gap: 5px;
-            font-size: 0.72rem; color: var(--green);
-            background: rgba(34,197,94,0.1);
-            border: 1px solid rgba(34,197,94,0.25);
-            border-radius: 999px; padding: 4px 10px;
-        }
-        .status-dot {
-            width: 6px; height: 6px; border-radius: 50%;
-            background: var(--green); box-shadow: 0 0 5px var(--green);
-            animation: blink 2s ease-in-out infinite;
-        }
-        @keyframes blink { 0%,100%{opacity:1;} 50%{opacity:0.3;} }
-
-        /* ── Greeting ── */
-        .greeting-row {
-            width: 100%; margin-bottom: 22px;
-        }
-        .greeting {
-            font-size: 1.5rem; font-weight: 700; letter-spacing: -0.5px;
-        }
-        .greeting-sub {
-            font-size: 0.85rem; color: var(--text-2); margin-top: 3px;
-        }
-
-        /* ── Main Converter Card ── */
-        .converter-card {
-            width: 100%;
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 20px;
+            font-family: 'SF Pro Display', 'Inter', -apple-system, sans-serif;
+            color: var(--text-primary);
+            height: 100vh;
             overflow: hidden;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+            display: flex;
+            align-items: center; justify-content: center;
+            background: #000; /* Backdrop for slideshow */
         }
 
-        /* Country selector rows */
-        .currency-row {
-            padding: 18px 20px 16px;
-            position: relative;
+        /* ── Premium Slideshow Background ── */
+        .slideshow-container {
+            position: fixed; inset: 0; z-index: -3;
+            overflow: hidden;
         }
-        .currency-row-label {
-            font-size: 0.7rem; font-weight: 600; color: var(--text-3);
-            text-transform: uppercase; letter-spacing: 0.8px;
-            margin-bottom: 10px;
+        .slide {
+            position: absolute; inset: 0;
+            background-size: cover; background-position: center;
+            opacity: 0;
+            filter: saturate(0.8) contrast(0.9);
+            animation: slide-anim 32s infinite;
         }
-        .country-selector {
-            display: flex; align-items: center; gap: 12px;
-        }
-        .country-select-wrap {
-            flex: 1;
-            position: relative;
-        }
-        .country-select {
-            width: 100%;
-            padding: 12px 40px 12px 14px;
-            border-radius: 12px;
-            border: 1.5px solid var(--border);
-            background: var(--surface-2);
-            color: var(--text-1);
-            font-size: 0.9rem; font-family: inherit; font-weight: 500;
-            outline: none; cursor: pointer;
-            appearance: none;
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2371717a'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
-            background-repeat: no-repeat;
-            background-position: right 12px center;
-            background-size: 14px;
-            transition: border-color 0.2s, box-shadow 0.2s;
-        }
-        .country-select:focus {
-            border-color: var(--accent);
-            box-shadow: 0 0 0 3px var(--accent-glow);
-        }
-        .country-select option { background: #18181b; }
-        .country-select:disabled {
-            opacity: 0.5; cursor: not-allowed;
+        .slide:nth-child(1) { background-image: url('assets/bg-palawan.png'); animation-delay: 0s; }
+        .slide:nth-child(2) { background-image: url('assets/bg-boracay.png'); animation-delay: 8s; }
+        .slide:nth-child(3) { background-image: url('assets/bg-bohol.png'); animation-delay: 16s; }
+        .slide:nth-child(4) { background-image: url('assets/bg-siargao.png'); animation-delay: 24s; }
+
+        @keyframes slide-anim {
+            0% { opacity: 0; transform: scale(1.1); }
+            5% { opacity: 1; }
+            25% { opacity: 1; transform: scale(1.02); }
+            30% { opacity: 0; transform: scale(1); }
+            100% { opacity: 0; }
         }
 
-        .amount-input-wrap {
-            width: 130px; flex-shrink: 0;
-            position: relative;
+        /* ── Glass Overlay Layers ── */
+        .glass-overlay {
+            position: fixed; inset: 0; z-index: -2;
+            background: rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
         }
-        .currency-badge {
-            position: absolute; left: 10px; top: 50%;
-            transform: translateY(-50%);
-            font-size: 0.75rem; font-weight: 600; color: var(--text-3);
+        .gradient-overlay {
+            position: fixed; inset: 0; z-index: -1;
+            background: radial-gradient(circle at center, transparent 0%, rgba(255,255,255,0.3) 100%);
+        }
+
+        /* ── Island Silhouette (Subtle) ── */
+        .island-layer {
+            position: fixed; inset: 0; z-index: -1;
+            display: flex; align-items: center; justify-content: center;
+            opacity: 0.05;
+            filter: invert(1) brightness(2);
+            mix-blend-mode: overlay;
             pointer-events: none;
         }
-        .amount-input {
-            width: 100%;
-            padding: 12px 10px 12px 34px;
-            border-radius: 12px;
-            border: 1.5px solid var(--border);
-            background: var(--surface-2);
-            color: var(--text-1);
-            font-size: 0.95rem; font-weight: 600; font-family: inherit;
-            outline: none; text-align: right;
-            transition: border-color 0.2s, box-shadow 0.2s;
-        }
-        .amount-input:focus {
-            border-color: var(--accent);
-            box-shadow: 0 0 0 3px var(--accent-glow);
-        }
-        .amount-input::-webkit-inner-spin-button { display: none; }
+        .island-layer img { width: 450px; opacity: 0.3; }
 
-        /* ── Divider / Swap row ── */
-        .swap-row {
-            display: flex; align-items: center; gap: 12px;
-            padding: 0 20px;
-            margin: -2px 0;
-            position: relative; z-index: 2;
-        }
-        .divider-line {
-            flex: 1; height: 1px; background: var(--border);
-        }
-        .swap-btn {
-            width: 38px; height: 38px; border-radius: 50%;
-            border: 1.5px solid var(--border-hover);
-            background: var(--surface-2);
-            color: var(--text-2);
-            display: flex; align-items: center; justify-content: center;
-            cursor: pointer; font-size: 16px;
-            transition: background 0.2s, border-color 0.2s, transform 0.3s, color 0.2s;
-            flex-shrink: 0;
-        }
-        .swap-btn:hover {
-            background: var(--accent); border-color: var(--accent);
-            color: #fff; transform: rotate(180deg);
-        }
-
-        /* ── Result area ── */
-        .result-area {
-            padding: 20px 20px 24px;
-            background: rgba(59,130,246,0.04);
-            border-top: 1px solid var(--border);
-        }
-        .result-label {
-            font-size: 0.72rem; font-weight: 600; color: var(--text-3);
-            text-transform: uppercase; letter-spacing: 0.8px;
-            margin-bottom: 10px;
-        }
-        .result-main {
-            display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;
-        }
-        .result-value {
-            font-size: 3rem; font-weight: 800; letter-spacing: -2px;
-            color: var(--text-1); line-height: 1;
-            transition: opacity 0.3s;
-        }
-        .result-value.loading { opacity: 0.4; }
-        .result-currency {
-            font-size: 1rem; font-weight: 600; color: var(--text-2);
-        }
-        .result-rate {
-            font-size: 0.78rem; color: var(--text-3); margin-top: 6px;
-        }
-        .result-rate strong { color: var(--text-2); }
-
-        /* ── Footer ── */
-        .card-footer {
-            display: flex; align-items: center; justify-content: space-between;
-            padding: 14px 20px;
-            border-top: 1px solid var(--border);
-        }
-        .footer-meta { font-size: 0.75rem; color: var(--text-3); display: flex; align-items: center; gap: 6px; }
-        .strategy-badge {
-            font-size: 0.68rem; padding: 2px 7px; border-radius: 999px;
-            background: rgba(59,130,246,0.1); color: var(--accent);
-            border: 1px solid rgba(59,130,246,0.2);
-        }
-        .refresh-btn {
-            padding: 7px 14px;
-            border-radius: 9px; border: 1px solid var(--border-hover);
-            background: var(--surface-2); color: var(--text-1);
-            font-size: 0.78rem; font-weight: 500; font-family: inherit;
-            cursor: pointer; display: flex; align-items: center; gap: 6px;
-            transition: background 0.2s;
-        }
-        .refresh-btn:hover { background: #27272a; }
-        .refresh-btn:active { transform: scale(0.97); }
-
-        /* ── "Locked" notice for non-PH ── */
-        .lock-notice {
-            width: 100%;
-            margin-top: 14px;
-            display: flex; align-items: center; gap: 8px;
-            padding: 10px 14px;
-            border-radius: 10px;
-            border: 1px solid rgba(245,158,11,0.25);
-            background: rgba(245,158,11,0.06);
-            font-size: 0.78rem; color: #fbbf24;
-        }
-        .lock-notice.hidden { display: none; }
-
-        /* ── Quick-ref list ── */
-        .quick-rates {
-            width: 100%;
-            margin-top: 18px;
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 16px;
+        /* ── Main Liquid Glass Dashboard Container ── */
+        .glass-card {
+            width: 440px;
+            background: rgba(255, 255, 255, 0.55);
+            backdrop-filter: blur(40px) saturate(180%);
+            -webkit-backdrop-filter: blur(40px) saturate(180%);
+            border-radius: 28px;
+            border: 1px solid rgba(255, 255, 255, 0.4);
+            padding: 32px;
+            box-shadow: 
+                0 10px 30px rgba(0,0,0,0.08),
+                inset 0 1px 0 rgba(255,255,255,0.6);
+            position: relative;
+            transform-style: preserve-3d;
+            transition: transform 0.8s var(--easing), box-shadow 0.8s var(--easing);
             overflow: hidden;
         }
-        .quick-rates-header {
-            padding: 14px 18px 10px;
-            font-size: 0.78rem; font-weight: 600; color: var(--text-3);
-            text-transform: uppercase; letter-spacing: 0.7px;
-            border-bottom: 1px solid var(--border);
+        /* Top-left light source highlight */
+        .glass-card::before {
+            content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px;
+            background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.8) 20%, rgba(255,255,255,0) 100%);
+            z-index: 2;
         }
-        .quick-rate-row {
-            display: flex; align-items: center; justify-content: space-between;
-            padding: 11px 18px;
-            border-bottom: 1px solid rgba(255,255,255,0.04);
-            font-size: 0.85rem;
-            transition: background 0.15s;
+        .glass-card:hover {
+            transform: translateY(-8px) scale(1.01);
+            box-shadow: 0 40px 80px rgba(0,0,0,0.12);
         }
-        .quick-rate-row:last-child { border-bottom: none; }
-        .quick-rate-row:hover { background: rgba(255,255,255,0.02); cursor: pointer; }
-        .quick-rate-left { display: flex; align-items: center; gap: 8px; color: var(--text-2); }
-        .quick-rate-val { font-weight: 600; color: var(--text-1); }
+
+        /* ── Header (Top Bar) ── */
+        .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
+        .app-icon {
+            width: 44px; height: 44px;
+            background: rgba(255,255,255,0.7);
+            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 24px; line-height: 1;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+            position: relative; overflow: hidden;
+        }
+        /* Micro shine on icon */
+        .app-icon::after {
+            content: ''; position: absolute; inset: -100%;
+            background: linear-gradient(120deg, transparent, rgba(255,255,255,0.6), transparent);
+            animation: icon-shine 4s infinite linear;
+        }
+        @keyframes icon-shine {
+            0% { transform: translateX(-100%) translateY(-100%) rotate(0deg); }
+            20% { transform: translateX(100%) translateY(100%) rotate(0deg); }
+            100% { transform: translateX(100%) translateY(100%) rotate(0deg); }
+        }
+        .logo-text { 
+            font-family: 'SF Pro Display', sans-serif;
+            font-size: 1.1rem; font-weight: 600; letter-spacing: -0.01em; 
+            opacity: 0.9;
+        }
+
+        /* ── Greeting Section ── */
+        .greeting-section { margin-bottom: 32px; }
+        .greeting-name { font-size: 2rem; font-weight: 800; letter-spacing: -0.04em; margin-bottom: 4px; }
+        .greeting-sub { font-size: 1rem; color: #1d1d1f; font-weight: 500; opacity: 0.6; }
+
+        /* ── Hero Exchange Rate Card ── */
+        .rate-container {
+            background: rgba(255, 255, 255, 0.35);
+            backdrop-filter: blur(30px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 20px;
+            padding: 24px;
+            text-align: center;
+            margin-bottom: 32px;
+            position: relative;
+            overflow: hidden;
+        }
+        /* Liquid Shimmer */
+        .rate-container::after {
+            content: ''; position: absolute; inset: 0;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+            transform: translateX(-100%);
+            animation: shimmer-load 3s infinite linear;
+            pointer-events: none;
+        }
+        @keyframes shimmer-load {
+            0% { transform: translateX(-150%); }
+            100% { transform: translateX(150%); }
+        }
+
+        .rate-label { 
+            display: flex; align-items: center; justify-content: center;
+            font-size: 0.9rem; font-weight: 700; color: #1d1d1f; 
+            opacity: 0.7; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px; 
+        }
+        .arrow-icon { opacity: 0.6; margin: 0 10px; }
+        
+        .rate-value {
+            font-size: 4rem; font-weight: 800; letter-spacing: -0.05em; line-height: 1;
+            color: #1d1d1f;
+            animation: value-pulse 6s infinite ease-in-out;
+            text-shadow: 0 0 20px rgba(255,255,255,0.4);
+        }
+        @keyframes value-pulse {
+            0%, 100% { filter: drop-shadow(0 0 0 rgba(255,255,255,0)); opacity: 1; }
+            50% { filter: drop-shadow(0 0 12px rgba(255,255,255,0.6)); opacity: 0.95; }
+        }
+        .rate-value span { font-size: 1.5rem; margin-right: 4px; vertical-align: baseline; }
+
+        /* ── Status & Refresh ── */
+        .footer { display: flex; align-items: center; justify-content: space-between; }
+        .status-pill { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: #1d1d1f; font-weight: 600; opacity: 0.7; }
+        .dot { width: 8px; height: 8px; background: var(--success); border-radius: 50%; box-shadow: 0 0 10px var(--success); }
+        .dot.pulse { animation: dot-pulse-premium 3s infinite var(--easing); }
+        @keyframes dot-pulse-premium {
+            0% { transform: scale(1); opacity: 0.3; }
+            50% { transform: scale(1.5); opacity: 1; box-shadow: 0 0 15px var(--success); }
+            100% { transform: scale(1); opacity: 0.3; }
+        }
+
+        .refresh-btn {
+            background: rgba(255, 255, 255, 0.4);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255,255,255,0.3);
+            padding: 10px 20px;
+            border-radius: 14px;
+            font-size: 0.9rem; font-weight: 600;
+            cursor: pointer; transition: all 0.4s var(--easing);
+            color: #1d1d1f;
+        }
+        .refresh-btn:hover { background: rgba(255, 255, 255, 0.6); transform: scale(1.03); }
+        .refresh-btn:active { transform: scale(0.96); opacity: 0.8; }
+        
+        /* ── Currency Select (PH Mode) ── */
+        .currency-select {
+            background: rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 8px;
+            padding: 4px 8px;
+            font-size: 0.9rem; font-weight: 700;
+            color: #1d1d1f;
+            cursor: pointer;
+            outline: none;
+            transition: all 0.3s var(--easing);
+            appearance: none;
+            -webkit-appearance: none;
+            text-align: center;
+        }
+        .currency-select:hover { background: rgba(255, 255, 255, 0.4); }
+        .currency-select:focus { border-color: var(--accent); }
+        
+        .currency-selector-container { display: none; align-items: center; gap: 4px; }
+        .currency-selector-container.active { display: flex; }
+
+        /* ── Neon Glass Orbs (VisionOS Depth) ── */
+        .neon-orb {
+            position: fixed;
+            width: 300px; height: 300px;
+            border-radius: 50%;
+            z-index: -2;
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(40px);
+            -webkit-backdrop-filter: blur(40px);
+            border: 1px solid rgba(0, 242, 255, 0.3);
+            box-shadow: 
+                0 0 20px rgba(0, 242, 255, 0.2),      /* Inner soft glow */
+                0 0 60px rgba(0, 242, 255, 0.15),     /* Medium outer glow */
+                inset 0 0 40px rgba(0, 242, 255, 0.1);/* Inner depth glow */
+            animation: orb-breathe 8s infinite ease-in-out;
+            pointer-events: none;
+        }
+        .orb-1 { top: 15%; left: 20%; width: 250px; height: 250px; animation-delay: 0s; }
+        .orb-2 { bottom: 10%; right: 15%; width: 350px; height: 350px; animation-delay: -4s; border-color: rgba(255, 255, 255, 0.2); box-shadow: 0 0 50px rgba(255,255,255,0.1); }
+
+        @keyframes orb-breathe {
+            0%, 100% { 
+                transform: scale(1) translateY(0); 
+                box-shadow: 0 0 30px rgba(0, 242, 255, 0.2), 0 0 70px rgba(0, 242, 255, 0.15);
+            }
+            50% { 
+                transform: scale(1.1) translateY(-20px); 
+                box-shadow: 0 0 50px rgba(0, 242, 255, 0.4), 0 0 100px rgba(0, 242, 255, 0.25);
+            }
+        }
+
+        /* ── Location Label (Bottom Corner) ── */
+        .location-label {
+            position: fixed; bottom: 24px; right: 24px;
+            font-size: 0.75rem; font-weight: 600; color: white;
+            opacity: 0.5; letter-spacing: 0.05em; text-transform: uppercase;
+            pointer-events: none;
+        }
+
+        /* ── Setup Overlay ── */
+        .first-visit-overlay {
+            position: fixed; inset: 0; z-index: 100;
+            display: flex; align-items: center; justify-content: center;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+        }
+        .setup-glass-card {
+            width: 380px;
+            background: rgba(255, 255, 255, 0.65);
+            backdrop-filter: blur(30px) saturate(180%);
+            -webkit-backdrop-filter: blur(30px) saturate(180%);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius);
+            padding: 40px 32px;
+            text-align: center;
+            box-shadow: 0 40px 100px rgba(0,0,0,0.1);
+            animation: card-appear 0.8s var(--easing);
+        }
+        @keyframes card-appear {
+            0% { opacity: 0; transform: translateY(20px) scale(0.95); }
+            100% { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        .liquid-input {
+            width: 100%; padding: 18px 20px; border-radius: 18px; 
+            border: 1px solid rgba(0,0,0,0.05);
+            background: rgba(255, 255, 255, 0.5);
+            font-size: 1.1rem; font-weight: 500; margin: 32px 0; 
+            outline: none; transition: all 0.3s var(--easing);
+            color: var(--text-primary);
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);
+        }
+        .liquid-input:focus { 
+            background: white; border-color: var(--accent);
+            box-shadow: 0 0 0 4px rgba(0, 113, 227, 0.15);
+        }
+
+        .liquid-btn {
+            width: 100%; padding: 18px; border-radius: 18px;
+            background: var(--accent); color: white;
+            font-size: 1.1rem; font-weight: 600; border: none;
+            cursor: pointer; transition: all 0.4s var(--easing);
+            box-shadow: 0 10px 30px rgba(0, 113, 227, 0.3);
+        }
+        .liquid-btn:hover { transform: scale(1.02); box-shadow: 0 15px 40px rgba(0, 113, 227, 0.4); }
+        .liquid-btn:active { transform: scale(0.98); opacity: 0.9; }
 
         .hidden { display: none !important; }
 
         @media (max-width: 480px) {
-            .amount-input-wrap { width: 100px; }
-            .result-value { font-size: 2.4rem; }
+            .glass-card { width: 90vw; padding: 24px; }
+            .rate-value { font-size: 3.2rem; }
         }
     </style>
 </head>
 <body>
-    <div class="bg-blobs">
-        <div class="blob blob-1"></div>
-        <div class="blob blob-2"></div>
-        <div class="blob blob-3"></div>
+
+    <!-- Premium Background Slideshow -->
+    <div class="slideshow-container">
+        <div class="slide"></div>
+        <div class="slide"></div>
+        <div class="slide"></div>
+        <div class="slide"></div>
+    </div>
+    
+    <div class="glass-overlay"></div>
+    <div class="gradient-overlay"></div>
+
+    <!-- Neon Glass Orbs -->
+    <div class="neon-orb orb-1"></div>
+    <div class="neon-orb orb-2"></div>
+
+    <!-- Island Layer (Subtle) -->
+    <div class="island-layer">
+        <img src="assets/ph-map.svg" alt="Philippines Map">
     </div>
 
-    <!-- First-visit name prompt -->
-    <div id="first-visit-overlay">
-        <div class="welcome-card">
-            <div class="logo">₱</div>
-            <h2>Welcome to PesoRate</h2>
-            <p>Your real-time OFW currency converter. What should we call you?</p>
-            <input type="text" id="name-input" placeholder="Your name" autocomplete="off" autocorrect="off" maxlength="30">
-            <button id="save-name-btn">Let's Go →</button>
+    <!-- Location Labels (Animated by CSS matching slides) -->
+    <style>
+        .loc-text { position: absolute; opacity: 0; animation: loc-fade 32s infinite; }
+        @keyframes loc-fade {
+            0%, 25% { opacity: 0; }
+            2%, 23% { opacity: 0.5; }
+            30%, 100% { opacity: 0; }
+        }
+    </style>
+    <div class="location-label">
+        <span class="loc-text" style="animation-delay: 0s">El Nido, Palawan</span>
+        <span class="loc-text" style="animation-delay: 8s">White Beach, Boracay</span>
+        <span class="loc-text" style="animation-delay: 16s">Chocolate Hills, Bohol</span>
+        <span class="loc-text" style="animation-delay: 24s">Coconut Palms, Siargao</span>
+    </div>
+
+    <!-- First Visit Overlay -->
+    <div id="first-visit" class="first-visit-overlay hidden">
+        <div class="setup-glass-card">
+            <div class="app-icon" style="margin: 0 auto 24px">₱</div>
+            <h2 style="font-size: 1.8rem; font-weight: 800; letter-spacing: -0.04em;">Welcome</h2>
+            <p style="color: var(--text-secondary); margin-top: 8px; font-weight: 500;">Let’s get your profile ready.</p>
+            
+            <input type="text" id="name-input" class="liquid-input" placeholder="What’s your name?" maxlength="15">
+            
+            <button id="save-name-btn" class="liquid-btn">Get Started</button>
+            <p style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 24px; opacity: 0.6;">Experience zero-cost currency monitoring.</p>
         </div>
     </div>
 
-    <main class="page" id="main-page">
-        <!-- Top Nav -->
-        <nav class="top-nav">
-            <div class="brand">
-                <div class="brand-icon">₱</div>
-                <span class="brand-name">PesoRate</span>
-            </div>
-            <div class="status-chip">
-                <div class="status-dot"></div>
-                Live
-            </div>
-        </nav>
-
-        <!-- Greeting -->
-        <div class="greeting-row">
-            <div class="greeting" id="greeting">Hello 👋</div>
-            <div class="greeting-sub" id="greeting-sub">Here's your real-time exchange rate today</div>
+    <!-- Dashboad Card -->
+    <div id="dashboard" class="glass-card hidden">
+        <div class="header">
+            <div class="app-icon">₱</div>
+            <span class="logo-text">OFW PesoRate</span>
         </div>
 
-        <!-- Main Converter Card -->
-        <div class="converter-card">
-            <!-- FROM row -->
-            <div class="currency-row">
-                <div class="currency-row-label">You have</div>
-                <div class="country-selector">
-                    <div class="country-select-wrap">
-                        <select id="from-select" class="country-select">
-                            <option value="SA">🇸🇦 SAR — Saudi Arabia</option>
-                            <option value="AE">🇦🇪 AED — United Arab Emirates</option>
-                            <option value="QA">🇶🇦 QAR — Qatar</option>
-                            <option value="KW">🇰🇼 KWD — Kuwait</option>
-                            <option value="OM">🇴🇲 OMR — Oman</option>
-                            <option value="BH">🇧🇭 BHD — Bahrain</option>
-                            <option value="GB">🇬🇧 GBP — United Kingdom</option>
-                            <option value="IT">🇮🇹 EUR — Italy</option>
-                            <option value="ES">🇪🇸 EUR — Spain</option>
-                            <option value="DE">🇩🇪 EUR — Germany</option>
-                            <option value="FR">🇫🇷 EUR — France</option>
-                            <option value="NL">🇳🇱 EUR — Netherlands</option>
-                            <option value="CH">🇨🇭 CHF — Switzerland</option>
-                            <option value="NO">🇳🇴 NOK — Norway</option>
-                            <option value="SE">🇸🇪 SEK — Sweden</option>
-                            <option value="SG">🇸🇬 SGD — Singapore</option>
-                            <option value="HK">🇭🇰 HKD — Hong Kong</option>
-                            <option value="MY">🇲🇾 MYR — Malaysia</option>
-                            <option value="TW">🇹🇼 TWD — Taiwan</option>
-                            <option value="JP">🇯🇵 JPY — Japan</option>
-                            <option value="KR">🇰🇷 KRW — South Korea</option>
-                            <option value="CN">🇨🇳 CNY — China</option>
-                            <option value="TH">🇹🇭 THB — Thailand</option>
-                            <option value="US">🇺🇸 USD — United States</option>
-                            <option value="CA">🇨🇦 CAD — Canada</option>
-                            <option value="MX">🇲🇽 MXN — Mexico</option>
-                            <option value="AU">🇦🇺 AUD — Australia</option>
-                            <option value="NZ">🇳🇿 NZD — New Zealand</option>
-                            <option value="PH">🇵🇭 PHP — Philippines</option>
-                        </select>
-                    </div>
-                    <div class="amount-input-wrap">
-                        <span class="currency-badge" id="from-badge">SGD</span>
-                        <input type="number" id="amount-input" class="amount-input" value="1" min="0" step="any">
-                    </div>
-                </div>
-            </div>
-
-            <!-- Swap row -->
-            <div class="swap-row">
-                <div class="divider-line"></div>
-                <button class="swap-btn" id="swap-btn" title="Swap currencies">⇅</button>
-                <div class="divider-line"></div>
-            </div>
-
-            <!-- TO row -->
-            <div class="currency-row">
-                <div class="currency-row-label">You get</div>
-                <div class="country-selector">
-                    <div class="country-select-wrap">
-                        <select id="to-select" class="country-select">
-                            <option value="PH" selected>🇵🇭 PHP — Philippines</option>
-                            <option value="SA">🇸🇦 SAR — Saudi Arabia</option>
-                            <option value="AE">🇦🇪 AED — United Arab Emirates</option>
-                            <option value="QA">🇶🇦 QAR — Qatar</option>
-                            <option value="KW">🇰🇼 KWD — Kuwait</option>
-                            <option value="OM">🇴🇲 OMR — Oman</option>
-                            <option value="BH">🇧🇭 BHD — Bahrain</option>
-                            <option value="GB">🇬🇧 GBP — United Kingdom</option>
-                            <option value="IT">🇮🇹 EUR — Italy / Eurozone</option>
-                            <option value="ES">🇪🇸 EUR — Spain</option>
-                            <option value="DE">🇩🇪 EUR — Germany</option>
-                            <option value="FR">🇫🇷 EUR — France</option>
-                            <option value="NL">🇳🇱 EUR — Netherlands</option>
-                            <option value="CH">🇨🇭 CHF — Switzerland</option>
-                            <option value="NO">🇳🇴 NOK — Norway</option>
-                            <option value="SE">🇸🇪 SEK — Sweden</option>
-                            <option value="SG">🇸🇬 SGD — Singapore</option>
-                            <option value="HK">🇭🇰 HKD — Hong Kong</option>
-                            <option value="MY">🇲🇾 MYR — Malaysia</option>
-                            <option value="TW">🇹🇼 TWD — Taiwan</option>
-                            <option value="JP">🇯🇵 JPY — Japan</option>
-                            <option value="KR">🇰🇷 KRW — South Korea</option>
-                            <option value="CN">🇨🇳 CNY — China</option>
-                            <option value="TH">🇹🇭 THB — Thailand</option>
-                            <option value="US">🇺🇸 USD — United States</option>
-                            <option value="CA">🇨🇦 CAD — Canada</option>
-                            <option value="MX">🇲🇽 MXN — Mexico</option>
-                            <option value="AU">🇦🇺 AUD — Australia</option>
-                            <option value="NZ">🇳🇿 NZD — New Zealand</option>
-                        </select>
-                    </div>
-                    <div class="amount-input-wrap">
-                        <span class="currency-badge" id="to-badge">PHP</span>
-                        <input type="number" id="result-input" class="amount-input" readonly
-                               placeholder="0.00" style="color:var(--text-2);cursor:default">
-                    </div>
-                </div>
-            </div>
-
-            <!-- Result display -->
-            <div class="result-area">
-                <div class="result-label">Exchange Rate</div>
-                <div class="result-main">
-                    <div class="result-value" id="rate-display">—</div>
-                    <div class="result-currency" id="rate-currency-label">PHP / SGD</div>
-                </div>
-                <div class="result-rate" id="rate-detail">Loading live rate...</div>
-            </div>
-
-            <!-- Footer -->
-            <div class="card-footer">
-                <div class="footer-meta">
-                    <span id="last-updated">Connecting...</span>
-                    <span class="strategy-badge" id="strategy-badge">live</span>
-                </div>
-                <button class="refresh-btn" id="refresh-btn">
-                    ↻ Refresh
-                </button>
-            </div>
+        <div class="greeting-section">
+            <h1 class="greeting-name" id="greeting">Hello, Mark 👋</h1>
+            <p class="greeting-sub" id="greeting-sub">Real-time exchange rates</p>
         </div>
 
-        <!-- Lock notice for non-PH users -->
-        <div class="lock-notice hidden" id="lock-notice">
-            🔒 Currency auto-detected from your location. Switching available for PH users only.
-        </div>
+        <div class="rate-container">
+            <div class="rate-label" id="currency-pair">
+                <!-- Static Label (Default) -->
+                <span id="base-currency-label">1 SGD</span>
+                
+                <!-- PH Mode Selector (Hidden by default) -->
+                <div id="ph-selector-container" class="currency-selector-container">
+                    <span>1</span>
+                    <select id="base-currency-select" class="currency-select">
+                        <option value="SGD">SGD</option>
+                        <option value="USD">USD</option>
+                        <option value="SAR">SAR</option>
+                        <option value="AED">AED</option>
+                        <option value="QAR">QAR</option>
+                        <option value="KWD">KWD</option>
+                        <option value="OMR">OMR</option>
+                        <option value="BHD">BHD</option>
+                        <option value="GBP">GBP</option>
+                        <option value="EUR">EUR</option>
+                        <option value="HKD">HKD</option>
+                        <option value="MYR">MYR</option>
+                        <option value="TWD">TWD</option>
+                        <option value="JPY">JPY</option>
+                        <option value="KRW">KRW</option>
+                        <option value="CNY">CNY</option>
+                    </select>
+                </div>
 
-        <!-- Quick reference rates -->
-        <div class="quick-rates" id="quick-rates-panel">
-            <div class="quick-rates-header">Popular rates to PHP</div>
-            <div id="quick-rates-body">
-                <!-- Populated by JS -->
+                <svg class="arrow-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+                <span id="target-currency-label">PHP</span>
             </div>
+            <div class="rate-value"><span id="target-symbol">₱</span><span id="rate-value">--.--</span></div>
         </div>
-    </main>
 
-    <script src="app.js"></script>
+        <div class="footer">
+            <div class="status-pill">
+                <div class="dot pulse"></div>
+                <span id="last-updated">Updating...</span>
+            </div>
+            <button class="refresh-btn" id="refresh-btn">Refresh</button>
+        </div>
+    </div>
+
+    <script src="app.js?v=2"></script>
 </body>
 </html>

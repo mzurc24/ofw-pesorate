@@ -1,4 +1,8 @@
 node_modules/
 .wrangler/
+.vs/
 error.txt
 error-utf8.txt
+run_error.txt
+run_error_utf8.txt
+run_log.txt

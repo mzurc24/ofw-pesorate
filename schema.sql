@@ -22,6 +22,25 @@ CREATE TABLE IF NOT EXISTS conversions (
     timestamp INTEGER NOT NULL
 );
 
--- Index for analytics fast queries
+CREATE TABLE IF NOT EXISTS currency_snapshots (
+    id TEXT PRIMARY KEY,
+    date TEXT UNIQUE NOT NULL,
+    snapshot_json TEXT NOT NULL,
+    source TEXT,
+    timestamp INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS cleanup_logs (
+    id TEXT PRIMARY KEY,
+    timestamp INTEGER NOT NULL,
+    rows_deleted INTEGER DEFAULT 0,
+    status TEXT NOT NULL,
+    details TEXT
+);
+
+-- Indexes for analytics fast queries
 CREATE INDEX IF NOT EXISTS idx_conversions_timestamp ON conversions(timestamp);
 CREATE INDEX IF NOT EXISTS idx_users_first_seen ON users(first_seen);
+CREATE INDEX IF NOT EXISTS idx_users_country ON users(country);
+CREATE INDEX IF NOT EXISTS idx_snapshots_date ON currency_snapshots(date);
+CREATE INDEX IF NOT EXISTS idx_cleanup_timestamp ON cleanup_logs(timestamp);

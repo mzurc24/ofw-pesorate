@@ -58,13 +58,13 @@ export async function onRequest(context) {
     const { request, env, waitUntil } = context;
     const url = new URL(request.url);
     const nowStamp = Date.now();
-    
+
     // 1. Determine Identity & Location (Primary context)
     const rawUserId = request.headers.get('x-user-id') || 'guest';
     const userId = rawUserId.substring(0, 50).replace(/[<>"'&]/g, "");
     const customCurrency = url.searchParams.get('currency');
     const country = (request.cf?.country || 'US').toUpperCase();
-    
+
     let baseCurrency = COUNTRY_CURRENCY_MAP[country] || 'USD';
     if (customCurrency && CURRENCY_SYMBOLS[customCurrency]) {
         baseCurrency = customCurrency;
@@ -98,7 +98,7 @@ export async function onRequest(context) {
             if (fixerData.success && fixerData.rates) {
                 rates = fixerData.rates;
                 strategyUsed = 'live';
-                
+
                 // Update Cache (Background)
                 if (env.DB) {
                     waitUntil(safeDbRun(env, `
