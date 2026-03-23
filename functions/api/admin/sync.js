@@ -16,16 +16,12 @@ async function safeDbRun(env, query, ...params) {
 }
 
 export async function onRequest(context) {
-    const { request, env } = context;
-    const authHeader = request.headers.get('Authorization');
-
     // 1. Security Check
-    const token = authHeader?.replace('Bearer ', '');
-    // Allow both Header and query param for Cron flexibility
-    const queryToken = new URL(request.url).searchParams.get('token');
+    const url = new URL(request.url);
+    const rawToken = url.searchParams.get('token') || request.headers.get('Authorization')?.replace('Bearer ', '');
     const validToken = env.CF_ADMIN_TOKEN || 'ofwAk026';
 
-    if ((!token || token !== validToken) && (!queryToken || queryToken !== validToken)) {
+    if (!rawToken || rawToken !== validToken) {
         return new Response(JSON.stringify({ status: 'error', message: 'Unauthorized' }), {
             status: 401,
             headers: { 'Content-Type': 'application/json' }
