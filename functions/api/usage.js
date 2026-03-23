@@ -28,8 +28,8 @@ export async function onRequest(context) {
     ]);
 
     return new Response(JSON.stringify({
-      recent_logs: usage.results,
-      summary: counts.results,
+      recent_logs: usage?.results || [],
+      summary: counts?.results || [],
       timestamp: new Date().toISOString()
     }), {
       headers: { 

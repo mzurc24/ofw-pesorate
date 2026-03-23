@@ -31,7 +31,14 @@ export async function onRequest(context) {
 
     // 2. Throttling Check (1 call per 24h)
     const CACHE_TTL = 86400;
-    const lastFetchRow = await env.DB.prepare("SELECT value FROM settings WHERE key = 'last_fixer_fetch'").first();
+    let lastFetchRow = null;
+    if (env.DB) {
+        try {
+            lastFetchRow = await env.DB.prepare("SELECT value FROM settings WHERE key = 'last_fixer_fetch'").first();
+        } catch (e) {
+            console.error('Settings fetch failed:', e);
+        }
+    }
     const now = Date.now();
 
     if (lastFetchRow && (now - parseInt(lastFetchRow.value)) / 1000 < CACHE_TTL) {
@@ -80,11 +87,14 @@ export async function onRequest(context) {
     } catch (e) {
         console.error('Sync process failed:', e);
         if (env.DB) {
-            await env.DB.prepare("INSERT INTO api_logs (endpoint, status) VALUES (?, ?)").bind("/api/admin/sync", "fail").run();
+            try {
+                await env.DB.prepare("INSERT INTO api_logs (endpoint, status) VALUES (?, ?)").bind("/api/admin/sync", "fail").run();
+            } catch (dbErr) { /* ignore secondary error */ }
         }
         return new Response(JSON.stringify({
             status: 'error',
-            message: e.message
+            message: e.message,
+            stack: e.stack
         }), {
             status: 500,
             headers: { 'Content-Type': 'application/json' }
