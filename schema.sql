@@ -46,6 +46,21 @@ CREATE TABLE IF NOT EXISTS api_logs (
     timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
+-- settings: Key-value store for system config (e.g. last_fixer_fetch timestamp)
+CREATE TABLE IF NOT EXISTS settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+);
+
+-- health_logs: Track system health checks for monitoring
+CREATE TABLE IF NOT EXISTS health_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    status TEXT NOT NULL,
+    details TEXT,
+    response_time_ms INTEGER,
+    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Indexes for analytics fast queries
 CREATE INDEX IF NOT EXISTS idx_conversions_timestamp ON conversions(timestamp);
 CREATE INDEX IF NOT EXISTS idx_users_first_seen ON users(first_seen);

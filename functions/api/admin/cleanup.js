@@ -6,6 +6,8 @@
  */
 
 export async function onRequest(context) {
+    const { request, env } = context;
+
     // 1. Security Check
     const url = new URL(request.url);
     const rawToken = url.searchParams.get('token') || request.headers.get('Authorization')?.replace('Bearer ', '');
@@ -18,25 +20,25 @@ export async function onRequest(context) {
         });
     }
 
-    if (!env.DB) return new Response('Database missing', { status: 500 });
+    if (!env.DB) return new Response(JSON.stringify({ status: 'error', message: 'Database missing' }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' }
+    });
 
     const startTime = Date.now();
     const cutoff = startTime - (7 * 24 * 60 * 60 * 1000); // 7 days ago in ms
 
     try {
         // 2. Execute Cleanup Queries
-        // We use batch to ensure atomicity and efficiency
         const results = await env.DB.batch([
-            // Delete old snapshots
             env.DB.prepare("DELETE FROM currency_snapshots WHERE timestamp < ?").bind(cutoff),
-            // Delete old conversions
             env.DB.prepare("DELETE FROM conversions WHERE timestamp < ?").bind(cutoff),
-            // Delete stale cache entries (keeping only latest is handled by sync's ON CONFLICT, 
-            // but this cleans up truly abandoned base currencies if they exist)
-            env.DB.prepare("DELETE FROM rates_cache WHERE updated_at < ?").bind(cutoff)
+            env.DB.prepare("DELETE FROM rates_cache WHERE updated_at < ?").bind(cutoff),
+            env.DB.prepare("DELETE FROM health_logs WHERE timestamp < datetime('now', '-7 days')"),
+            env.DB.prepare("DELETE FROM api_logs WHERE timestamp < datetime('now', '-7 days')")
         ]);
 
-        const totalDeleted = results.reduce((sum, res) => sum + (res.meta.changes || 0), 0);
+        const totalDeleted = results.reduce((sum, res) => sum + (res.meta?.changes || 0), 0);
         const duration = Date.now() - startTime;
 
         // 3. Log Cleanup Results
@@ -49,7 +51,7 @@ export async function onRequest(context) {
             startTime, 
             totalDeleted, 
             'success', 
-            `Execution took ${duration}ms. Snapshots: ${results[0].meta.changes}, Conversions: ${results[1].meta.changes}, Cache: ${results[2].meta.changes}`
+            `Execution took ${duration}ms. Snapshots: ${results[0].meta?.changes || 0}, Conversions: ${results[1].meta?.changes || 0}, Cache: ${results[2].meta?.changes || 0}, Health: ${results[3].meta?.changes || 0}, Logs: ${results[4].meta?.changes || 0}`
         ).run();
 
         return new Response(JSON.stringify({
@@ -58,13 +60,12 @@ export async function onRequest(context) {
             duration_ms: duration,
             cutoff_date: new Date(cutoff).toISOString()
         }), {
-            headers: { 'Content-Type': 'application/json' }
+            headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
         });
 
     } catch (e) {
         console.error('Cleanup process failed:', e);
         
-        // Log Failure
         try {
             await env.DB.prepare(`
                 INSERT INTO cleanup_logs (id, timestamp, rows_deleted, status, details)
@@ -74,7 +75,7 @@ export async function onRequest(context) {
 
         return new Response(JSON.stringify({ status: 'error', message: e.message }), {
             status: 500,
-            headers: { 'Content-Type': 'application/json' }
+            headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
         });
     }
 }

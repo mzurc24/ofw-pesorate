@@ -2,7 +2,27 @@
  * /api/admin/sync
  * Manually or via Cron trigger a fresh rate sync from Fixer.
  * Security: Token required via param or header.
+ * Version: 2.0.0 (Self-Healing with Retry)
  */
+
+async function fetchWithRetry(url, retries = 3, delayMs = 1000) {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 5000);
+      const res = await fetch(url, { signal: controller.signal });
+      clearTimeout(timeout);
+      if (res.ok) return res;
+      console.error(`Sync fetch attempt ${attempt}/${retries}: HTTP ${res.status}`);
+    } catch (e) {
+      console.error(`Sync fetch attempt ${attempt}/${retries}: ${e.message}`);
+    }
+    if (attempt < retries) {
+      await new Promise(r => setTimeout(r, delayMs * attempt));
+    }
+  }
+  return null;
+}
 
 export async function onRequest(context) {
   const { request, env } = context;
@@ -19,38 +39,52 @@ export async function onRequest(context) {
     });
   }
 
-  // Use a global try-catch for mission-critical reliability
   try {
     const now = Date.now();
     const CACHE_TTL = 86400; // 24 hours
 
-    // 2. Throttling Check
-    if (env.DB) {
+    // 2. Throttling Check (skip if force=true)
+    const forceSync = url.searchParams.get('force') === 'true';
+    if (!forceSync && env.DB) {
       try {
         const lastFetchRow = await env.DB.prepare("SELECT value FROM settings WHERE key = 'last_fixer_fetch'").first();
         if (lastFetchRow && lastFetchRow.value) {
           const lastFetch = parseInt(lastFetchRow.value);
           if ((now - lastFetch) / 1000 < CACHE_TTL) {
             return new Response(JSON.stringify({
-              status: 'error',
-              message: 'Rate limit safety: 1 call per 24 hours. Data is fresh.'
+              status: 'throttled',
+              message: 'Rate limit safety: 1 call per 24 hours. Data is fresh.',
+              last_sync: new Date(lastFetch).toISOString(),
+              next_sync_available: new Date(lastFetch + CACHE_TTL * 1000).toISOString()
             }), {
               status: 429,
-              headers: { 'Content-Type': 'application/json' }
+              headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
             });
           }
         }
       } catch (dbErr) {
-        console.error('Throttling check failed (non-fatal):', dbErr);
+        console.error('Throttling check failed (non-fatal):', dbErr.message);
       }
     }
 
-    // 3. Fetch from Fixer
+    // 3. Fetch from Fixer with retry
     const apiKey = env.CF_FIXER_KEY || 'c056294df71360e7b8e84205ef080e47';
     const baseUrl = 'http://data.fixer.io/api/latest';
     
-    const response = await fetch(`${baseUrl}?access_key=${apiKey}`);
-    if (!response.ok) throw new Error(`Fixer API status: ${response.status}`);
+    const response = await fetchWithRetry(`${baseUrl}?access_key=${apiKey}`);
+    if (!response) {
+      console.error('CRITICAL: All sync retries exhausted');
+      if (env.DB) {
+        try { await env.DB.prepare("INSERT INTO api_logs (endpoint, status) VALUES (?, ?)").bind("/api/admin/sync", "fail_all_retries").run(); } catch(e) {}
+      }
+      return new Response(JSON.stringify({
+        status: 'error',
+        message: 'All Fixer API retries exhausted. Cached data still being served.'
+      }), {
+        status: 502,
+        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
+      });
+    }
     
     const data = await response.json();
     if (!data.success || !data.rates) {
@@ -68,8 +102,7 @@ export async function onRequest(context) {
           env.DB.prepare("INSERT INTO api_logs (endpoint, status) VALUES (?, ?)").bind("/api/admin/sync", "success")
         ]);
       } catch (writeErr) {
-         console.error('D1 Write Failed:', writeErr);
-         // Fallback: log failure if possible
+         console.error('D1 Write Failed:', writeErr.message);
          try {
            await env.DB.prepare("INSERT INTO api_logs (endpoint, status) VALUES (?, ?)").bind("/api/admin/sync", "fail_write").run();
          } catch(e) {}
@@ -79,8 +112,8 @@ export async function onRequest(context) {
     return new Response(JSON.stringify({
       status: 'success',
       message: 'Sync completed successfully',
-      timestamp: now,
-      count: Object.keys(data.rates).length
+      timestamp: new Date(now).toISOString(),
+      rates_count: Object.keys(data.rates).length
     }), {
       headers: { 
         'Content-Type': 'application/json',
@@ -89,22 +122,19 @@ export async function onRequest(context) {
     });
 
   } catch (err) {
-    console.error('Fatal Sync Error:', err);
-    
-    // Attempt to log failure to D1
+    console.error('Fatal Sync Error:', err.message);
     if (env.DB) {
       try {
         await env.DB.prepare("INSERT INTO api_logs (endpoint, status) VALUES (?, ?)").bind("/api/admin/sync", "fail_fatal").run();
       } catch(e) {}
     }
-
     return new Response(JSON.stringify({
       status: 'error',
-      message: err.message,
-      stack: err.stack
+      message: err.message
+      // No stack trace in production
     }), {
       status: 500,
-      headers: { 'Content-Type': 'application/json' }
+      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
     });
   }
 }

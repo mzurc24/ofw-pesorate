@@ -37,6 +37,8 @@ const SUPPORTED_COUNTRIES = [
 ];
 
 export async function onRequest(context) {
+    const { request, env } = context;
+
     // 1. Security Check
     const url = new URL(request.url);
     const rawToken = url.searchParams.get('token') || request.headers.get('Authorization')?.replace('Bearer ', '');
@@ -49,16 +51,19 @@ export async function onRequest(context) {
         });
     }
 
-    // 2. Fetch Latest Rates from D1 Cache (Primary source for snapshot)
-    // If cache is empty, we force a live fetch first.
-    if (!env.DB) return new Response('Database missing', { status: 500 });
+    if (!env.DB) return new Response(JSON.stringify({ status: 'error', message: 'Database missing' }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' }
+    });
 
     try {
         let ratesRow = await env.DB.prepare("SELECT rates_json, updated_at FROM rates_cache WHERE base_currency = 'EUR'").first();
         
-        // If stale or missing, return error (cron should sync first)
         if (!ratesRow) {
-            return new Response(JSON.stringify({ status: 'error', message: 'No rates in cache. Run sync first.' }), { status: 400 });
+            return new Response(JSON.stringify({ status: 'error', message: 'No rates in cache. Run sync first.' }), {
+                status: 400,
+                headers: { 'Content-Type': 'application/json' }
+            });
         }
 
         const allRates = JSON.parse(ratesRow.rates_json);
@@ -100,14 +105,14 @@ export async function onRequest(context) {
             snapshot_saved: true,
             timestamp: finalData.timestamp
         }), {
-            headers: { 'Content-Type': 'application/json' }
+            headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
         });
 
     } catch (e) {
         console.error('Snapshot process failed:', e);
         return new Response(JSON.stringify({ status: 'error', message: e.message }), {
             status: 500,
-            headers: { 'Content-Type': 'application/json' }
+            headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
         });
     }
 }
