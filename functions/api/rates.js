@@ -19,12 +19,12 @@ export const EMERGENCY_RATES = {
 /**
  * Normalization Engine
  * Rate(Target) = Fixer[Target] / Fixer[Source]
- * Standardizes all calculations to 6 decimal places for rates.
+ * Standardizes all calculations to 8 decimal places for rates to prevent drift.
  */
 export function calculateRate(rates, from, to) {
   const eurToSource = rates[from] || EMERGENCY_RATES[from] || 1;
   const eurToTarget = rates[to] || EMERGENCY_RATES[to] || 1;
-  return parseFloat((eurToTarget / eurToSource).toFixed(6));
+  return parseFloat((eurToTarget / eurToSource).toFixed(8));
 }
 
 async function shouldFetch(env) {
