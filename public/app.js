@@ -108,7 +108,8 @@
             if (targetCurrencyLabelEl) targetCurrencyLabelEl.textContent = data.to_currency;
             
             // Single Source of Math: Using rate exactly as provided by Worker
-            animateNumber(rateValueEl, parseFloat(rateValueEl.textContent) || 0, data.rate);
+            const currentContent = rateValueEl.textContent.replace(/,/g, '');
+            animateNumber(rateValueEl, parseFloat(currentContent) || 0, data.rate);
             
             targetSymbolEl.textContent = data.target_symbol || '₱';
             lastUpdatedEl.textContent = `Updated ${new Date().toLocaleTimeString([], { hour: '2-digit', minute:'2-digit' })}`;
@@ -133,12 +134,21 @@
             // Quartic ease-out for a true Apple feel
             const ease = 1 - Math.pow(1 - progress, 4);
             
-            // Consistency Check: Precision is crucial, using 4 decimal places for rates
-            const current = (start + (end - start) * ease).toFixed(4);
-            el.textContent = current;
+            // Format to standard localized currency (###.00)
+            const currentVal = start + (end - start) * ease;
+            const currentStr = new Intl.NumberFormat('en-US', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            }).format(currentVal);
+            el.textContent = currentStr;
             
             if (progress < 1) {
                 requestAnimationFrame(update);
+            } else {
+                el.textContent = new Intl.NumberFormat('en-US', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2
+                }).format(end);
             }
         }
         requestAnimationFrame(update);
