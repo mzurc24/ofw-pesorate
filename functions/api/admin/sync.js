@@ -96,11 +96,11 @@ export async function onRequest(context) {
     // 4. Update D1
     if (env.DB) {
       try {
-        await env.DB.batch([
-          env.DB.prepare("INSERT INTO rates_cache (base_currency, rates_json, updated_at) VALUES ('EUR', ?, ?) ON CONFLICT(base_currency) DO UPDATE SET rates_json = excluded.rates_json, updated_at = excluded.updated_at").bind(ratesJson, now),
-          env.DB.prepare("INSERT INTO settings (key, value) VALUES ('last_fixer_fetch', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").bind(now.toString()),
-          env.DB.prepare("INSERT INTO api_logs (endpoint, status) VALUES (?, ?)").bind("/api/admin/sync", "success")
-        ]);
+        await env.DB.prepare("REPLACE INTO rates_cache (base_currency, rates_json, updated_at) VALUES ('EUR', ?, ?)").bind(ratesJson, now).run();
+        try {
+          await env.DB.prepare("REPLACE INTO settings (key, value) VALUES ('last_fixer_fetch', ?)").bind(now.toString()).run();
+          await env.DB.prepare("INSERT INTO api_logs (endpoint, status) VALUES (?, ?)").bind("/api/admin/sync", "success").run();
+        } catch(e) { console.error('Secondary write failed', e); }
       } catch (writeErr) {
          console.error('D1 Write Failed:', writeErr.message);
          try {

@@ -162,10 +162,10 @@ export async function onRequest(context) {
     if (env.DB) {
       try {
         const nowStamp = Date.now();
-        await env.DB.batch([
-          env.DB.prepare("INSERT INTO rates_cache (base_currency, rates_json, updated_at) VALUES ('EUR', ?, ?) ON CONFLICT(base_currency) DO UPDATE SET rates_json = excluded.rates_json, updated_at = excluded.updated_at").bind(JSON.stringify(data.rates), nowStamp),
-          env.DB.prepare("INSERT INTO settings (key, value) VALUES ('last_fixer_fetch', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").bind(nowStamp.toString())
-        ]);
+        await env.DB.prepare("REPLACE INTO rates_cache (base_currency, rates_json, updated_at) VALUES ('EUR', ?, ?)").bind(JSON.stringify(data.rates), nowStamp).run();
+        try {
+          await env.DB.prepare("REPLACE INTO settings (key, value) VALUES ('last_fixer_fetch', ?)").bind(nowStamp.toString()).run();
+        } catch(e) { console.error(e); }
         await logUsage(env, "/api/rates", "success");
       } catch (dbErr) {
         console.error('D1 write failed (non-fatal):', dbErr.message);

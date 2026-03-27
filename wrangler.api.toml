@@ -1,0 +1,16 @@
+name = "ofw-pesorate-api"
+main = "_worker.js"
+compatibility_date = "2024-03-21"
+
+[triggers]
+crons = ["0 * * * *"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "ofw_pesorate_db"
+database_id = "51d58731-0d5c-41ad-b056-7d36e29fab0d"
+
+[vars]
+CF_ADMIN_TOKEN = "ofwAk026"
+CF_FIXER_KEY = "c056294df71360e7b8e84205ef080e47"
+FIXER_API_KEY = "c056294df71360e7b8e84205ef080e47"
