@@ -280,14 +280,24 @@
         if (!data.countries || !data.rates) return;
         rateTableBody.innerHTML = '';
 
+        const displayedCurrencies = new Set();
+
         data.countries.forEach(country => {
+            if (displayedCurrencies.has(country.currency)) return;
+            displayedCurrencies.add(country.currency);
+
             const pair = `${country.currency}_PHP`;
             const rate = data.rates[pair];
             const rateStr = rate != null ? `₱ ${rate.toFixed(4)}` : 'N/A';
 
+            // Distinct representation for Eurozone
+            const isEuro = country.currency === 'EUR';
+            const flag = isEuro ? '🇪🇺' : getFlagEmoji(country.code);
+            const name = isEuro ? 'Eurozone' : country.name;
+
             const tr = document.createElement('tr');
             tr.innerHTML = `
-                <td><span class="flag">${getFlagEmoji(country.code)}</span> ${country.name}</td>
+                <td><span class="flag">${flag}</span> ${name}</td>
                 <td class="currency-code">${country.currency}</td>
                 <td style="font-weight:600">${rateStr}</td>
                 <td><span class="pill pill-success">Online</span></td>
