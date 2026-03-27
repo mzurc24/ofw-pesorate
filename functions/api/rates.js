@@ -1,20 +1,31 @@
 /**
  * /api/rates
- * Centralized Fixer.io Sync Service
- * Throttled to 1 call per 24 hours.
- * Caches in D1.
- * Logs success/failure to D1 api_logs.
- * Version: 2.0.0 (Self-Healing)
+ * Centralized Fixer.io Sync & Normalization Service
+ * Single Source of Truth for all currency data.
+ * Version: 3.0.0 (Consistency Engine)
  */
 
 const CACHE_TTL = 86400; // 24 hours in seconds
 
 // Emergency hardcoded fallback rates (EUR-based)
-const EMERGENCY_RATES = {
+export const EMERGENCY_RATES = {
   USD: 1.09, PHP: 64.0, SGD: 1.46, JPY: 161.2, GBP: 0.86,
   SAR: 4.04, AED: 3.98, QAR: 3.94, KWD: 0.33, OMR: 0.42,
-  BHD: 0.41, EUR: 1.00, CAD: 1.51, AUD: 1.70, NZD: 1.87
+  BHD: 0.41, EUR: 1.00, CAD: 1.51, AUD: 1.70, NZD: 1.87,
+  CHF: 0.97, NOK: 11.49, SEK: 11.17, HKD: 8.49, MYR: 4.84,
+  TWD: 34.58, KRW: 1457, CNY: 7.88, THB: 37.72, MXN: 21.5
 };
+
+/**
+ * Normalization Engine
+ * Rate(Target) = Fixer[Target] / Fixer[Source]
+ * Standardizes all calculations to 6 decimal places for rates.
+ */
+export function calculateRate(rates, from, to) {
+  const eurToSource = rates[from] || EMERGENCY_RATES[from] || 1;
+  const eurToTarget = rates[to] || EMERGENCY_RATES[to] || 1;
+  return parseFloat((eurToTarget / eurToSource).toFixed(6));
+}
 
 async function shouldFetch(env) {
   if (!env.DB) return true;
@@ -24,7 +35,6 @@ async function shouldFetch(env) {
     const now = Date.now();
     return (now - parseInt(lastFetchRow.value)) / 1000 >= CACHE_TTL;
   } catch (e) {
-    // settings table might not exist yet — allow fetch
     console.error('shouldFetch check failed (non-fatal):', e.message);
     return true;
   }
@@ -48,7 +58,7 @@ async function fetchWithRetry(url, retries = 3, delayMs = 1000) {
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 5000); // 5s timeout
+      const timeout = setTimeout(() => controller.abort(), 5000); 
       const res = await fetch(url, { signal: controller.signal });
       clearTimeout(timeout);
       if (res.ok) return res;
@@ -57,10 +67,10 @@ async function fetchWithRetry(url, retries = 3, delayMs = 1000) {
       console.error(`Fixer API attempt ${attempt}/${retries}: ${e.message}`);
     }
     if (attempt < retries) {
-      await new Promise(r => setTimeout(r, delayMs * attempt)); // exponential backoff
+      await new Promise(r => setTimeout(r, delayMs * attempt)); 
     }
   }
-  return null; // all retries exhausted
+  return null;
 }
 
 export async function onRequest(context) {
@@ -69,7 +79,7 @@ export async function onRequest(context) {
   const headers = {
     'Content-Type': 'application/json',
     'Access-Control-Allow-Origin': '*',
-    'Cache-Control': 'public, max-age=600, s-maxage=600' // 10 min frontend cache
+    'Cache-Control': 'public, max-age=600, s-maxage=600'
   };
 
   try {
@@ -94,19 +104,17 @@ export async function onRequest(context) {
         success: true,
         rates: cached.rates,
         timestamp: cached.timestamp,
-        _meta: { strategy: "daily_cache", source: "D1" }
+        _meta: { strategy: "daily_cache", source: "D1", normalized: true }
       }), { headers });
     }
 
     // 3. Fetch fresh data with retry logic
-    console.log("Fetching fresh daily data from Fixer.io");
-    const apiKey = env.CF_FIXER_KEY || 'c056294df71360e7b8e84205ef080e47';
-    const fixerUrl = `http://data.fixer.io/api/latest?access_key=${apiKey}&symbols=USD,SGD,PHP,JPY,EUR,SAR,AED,QAR,KWD,OMR,BHD,GBP,CAD,AUD,NZD`;
+    const apiKey = env.CF_FIXER_KEY || '566e5ce2bbb50f23733c34b6b07146b2';
+    const fixerUrl = `http://data.fixer.io/api/latest?access_key=${apiKey}`;
 
     const res = await fetchWithRetry(fixerUrl);
     
     if (!res) {
-      // All retries failed — serve cache or emergency fallback
       console.error('CRITICAL: All Fixer API retries exhausted');
       await logUsage(env, "/api/rates", "fail_all_retries");
 
@@ -133,7 +141,6 @@ export async function onRequest(context) {
       console.error('Fixer API returned error:', errMsg);
       await logUsage(env, "/api/rates", "fail_api_error");
 
-      // Serve cached or fallback
       if (cached) {
         return new Response(JSON.stringify({
           success: true,
@@ -168,12 +175,11 @@ export async function onRequest(context) {
     return new Response(JSON.stringify({
       success: true,
       rates: data.rates,
-      timestamp: data.timestamp || Date.now(),
-      _meta: { strategy: "fresh_sync", source: "Fixer.io" }
+      timestamp: data.timestamp ? data.timestamp * 1000 : Date.now(),
+      _meta: { strategy: "fresh_sync", source: "Fixer.io", normalized: true }
     }), { headers });
 
   } catch (err) {
-    // Global catch — NEVER crash the worker
     console.error("FATAL /api/rates error:", err.message);
     
     return new Response(JSON.stringify({

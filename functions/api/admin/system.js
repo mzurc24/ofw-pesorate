@@ -3,7 +3,10 @@
  * Returns the current health and status of the currency system.
  * Includes API health, DB status, country analytics data.
  * Security: Bearer Token Auth
+ * Version: 3.0.0 (Consistency Engine)
  */
+
+import { calculateRate, EMERGENCY_RATES } from '../rates.js';
 
 const SUPPORTED_COUNTRIES = [
     { code: 'SA', name: 'Saudi Arabia', currency: 'SAR' },
@@ -37,8 +40,6 @@ const SUPPORTED_COUNTRIES = [
 ];
 
 export async function onRequest(context) {
-    // 1. Security Check
-    // Use consistent auth logic across all admin files and handle Fixer API limits in sync.js
     const { request, env } = context;
     const url = new URL(request.url);
     const rawToken = url.searchParams.get('token') || request.headers.get('Authorization')?.replace('Bearer ', '');
@@ -51,7 +52,6 @@ export async function onRequest(context) {
         });
     }
 
-    // 2. Fetch Latest State from D1
     let rates = {};
     let lastUpdated = null;
     let lastCleanup = null;
@@ -68,7 +68,6 @@ export async function onRequest(context) {
 
     if (env.DB) {
         try {
-            // Core rates data from D1 (New Primary)
             const dbRow = await env.DB.prepare("SELECT rates_json, updated_at FROM rates_cache WHERE base_currency = 'EUR'").first();
             const lastFetchRow = await env.DB.prepare("SELECT value FROM settings WHERE key = 'last_fixer_fetch'").first();
             
@@ -76,19 +75,16 @@ export async function onRequest(context) {
 
             if (dbRow) {
                 const allRates = JSON.parse(dbRow.rates_json);
-                const eurToPhp = allRates['PHP'] || 1;
-
+                
+                // Use centralized calculateRate for 100% mathematical consistency
                 SUPPORTED_COUNTRIES.forEach(c => {
-                    const eurToCur = allRates[c.currency] || 1;
-                    rates[`${c.currency}_PHP`] = parseFloat((eurToPhp / eurToCur).toFixed(4));
+                    rates[`${c.currency}_PHP`] = calculateRate(allRates, c.currency, 'PHP');
                 });
 
-                // Use the specifically tracked fixer fetch time or the row update time
                 const syncTimestamp = lastFetchRow ? parseInt(lastFetchRow.value) : dbRow.updated_at;
                 lastUpdated = new Date(syncTimestamp).toISOString();
                 strategy = 'd1_sync';
 
-                // Check if rates are stale (>24 hours for daily sync)
                 const ageMs = Date.now() - syncTimestamp;
                 if (ageMs < 24 * 60 * 60 * 1000) {
                     apiStatus = 'healthy';
@@ -116,7 +112,7 @@ export async function onRequest(context) {
                 }
             } catch (e) { /* table may not exist yet */ }
 
-            // Country analytics — users per country
+            // Analytics
             try {
                 const countryRows = await env.DB.prepare(`
                     SELECT country, COUNT(*) as user_count FROM users 
@@ -131,13 +127,11 @@ export async function onRequest(context) {
                 }
             } catch (e) { /* ok if empty */ }
 
-            // Total users count
             try {
                 const userRow = await env.DB.prepare("SELECT COUNT(*) as count FROM users").first();
                 totalUsers = userRow?.count || 0;
             } catch (e) { /* ok */ }
 
-            // Total conversions (7d)
             try {
                 const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
                 const convRow = await env.DB.prepare("SELECT COUNT(*) as count FROM conversions WHERE timestamp >= ?").bind(sevenDaysAgo).first();
@@ -152,7 +146,6 @@ export async function onRequest(context) {
 
     const dbResponseTime = Date.now() - dbStart;
 
-    // 3. Prepare Response
     return new Response(JSON.stringify({
         status: 'success',
         countries: SUPPORTED_COUNTRIES.map(c => ({
@@ -178,6 +171,9 @@ export async function onRequest(context) {
             users_by_country: countryAnalytics
         }
     }), {
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*'
+        }
     });
 }

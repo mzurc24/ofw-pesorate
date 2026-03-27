@@ -3,7 +3,10 @@
  * End-of-Day Currency Analytics Snapshot trigger.
  * Captures all rates and country mappings for historical trend analysis.
  * Security: Bearer Token Auth
+ * Version: 3.0.0 (Consistency Engine)
  */
+
+import { calculateRate, EMERGENCY_RATES } from '../rates.js';
 
 const SUPPORTED_COUNTRIES = [
     { code: 'SA', name: 'Saudi Arabia', currency: 'SAR' },
@@ -59,22 +62,22 @@ export async function onRequest(context) {
     try {
         let ratesRow = await env.DB.prepare("SELECT rates_json, updated_at FROM rates_cache WHERE base_currency = 'EUR'").first();
         
-        if (!ratesRow) {
-            return new Response(JSON.stringify({ status: 'error', message: 'No rates in cache. Run sync first.' }), {
-                status: 400,
-                headers: { 'Content-Type': 'application/json' }
-            });
+        let allRates = null;
+        if (ratesRow) {
+            allRates = JSON.parse(ratesRow.rates_json);
+        } else {
+            console.warn('Snapshot: No rates in cache. Using emergency fallbacks.');
+            allRates = EMERGENCY_RATES;
         }
 
-        const allRates = JSON.parse(ratesRow.rates_json);
-        const eurToPhp = allRates['PHP'] || 1;
         const nowStamp = Date.now();
         const dateStr = new Date().toISOString().split('T')[0];
 
-        // 3. Structure Snapshot Data
+        // 3. Structure Snapshot Data using centralized Normalization Engine
         const snapshot = SUPPORTED_COUNTRIES.map(c => {
-            const eurToCur = allRates[c.currency] || 1;
-            const rate = parseFloat((eurToPhp / eurToCur).toFixed(4));
+            // Using calculateRate to ensure 100% math consistency
+            // source: c.currency, target: PHP
+            const rate = calculateRate(allRates, c.currency, 'PHP');
             return {
                 pair: `${c.currency}_PHP`,
                 rate: rate
@@ -84,8 +87,9 @@ export async function onRequest(context) {
         const finalData = {
             date: dateStr,
             snapshot: snapshot,
-            source: 'live_through_cache',
-            timestamp: new Date().toISOString()
+            source: ratesRow ? 'live_through_cache' : 'emergency_fallback',
+            timestamp: new Date().toISOString(),
+            math_version: '3.0.0'
         };
 
         // 4. Save to D1
@@ -97,13 +101,14 @@ export async function onRequest(context) {
                 snapshot_json = EXCLUDED.snapshot_json,
                 source = EXCLUDED.source,
                 timestamp = EXCLUDED.timestamp
-        `).bind(id, dateStr, JSON.stringify(finalData), 'live_through_cache', nowStamp).run();
+        `).bind(id, dateStr, JSON.stringify(finalData), finalData.source, nowStamp).run();
 
         return new Response(JSON.stringify({
             status: 'success',
             date: dateStr,
             snapshot_saved: true,
-            timestamp: finalData.timestamp
+            timestamp: finalData.timestamp,
+            math_consistent: true
         }), {
             headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
         });

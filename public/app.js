@@ -107,7 +107,7 @@
 
             if (targetCurrencyLabelEl) targetCurrencyLabelEl.textContent = data.to_currency;
             
-            // Smooth Number Transition
+            // Single Source of Math: Using rate exactly as provided by Worker
             animateNumber(rateValueEl, parseFloat(rateValueEl.textContent) || 0, data.rate);
             
             targetSymbolEl.textContent = data.target_symbol || '₱';
@@ -126,20 +126,15 @@
         const duration = 1200;
         const startTime = performance.now();
         
-        // Exact cubic-bezier(0.22, 1, 0.36, 1) approximation
-        function easeOutApple(t) {
-            return 1 - Math.pow(1 - t, 3); // Cubic fallback for simplicity, or use formal bezier
-        }
-        
         function update(currentTime) {
             const elapsed = currentTime - startTime;
             const progress = Math.min(elapsed / duration, 1);
             
-            // For a true Apple feel, we'll use a standard cubic-bezier approximation
-            // x1=0.22, y1=1, x2=0.36, y2=1
-            const ease = 1 - Math.pow(1 - progress, 4); // Quartic is a close feel-match for fast start, slow end
+            // Quartic ease-out for a true Apple feel
+            const ease = 1 - Math.pow(1 - progress, 4);
             
-            const current = (start + (end - start) * ease).toFixed(2);
+            // Consistency Check: Precision is crucial, using 4 decimal places for rates
+            const current = (start + (end - start) * ease).toFixed(4);
             el.textContent = current;
             
             if (progress < 1) {

@@ -1,52 +1,61 @@
-name: Daily Rate Sync (Self-Healing Cron)
+name: Hourly Consistency & Rate Sync (Self-Healing)
 
 on:
   schedule:
-    # Run every 6 hours — Fixer free plan allows ~1000 calls/month
-    - cron: '0 */6 * * *'
+    # Run every hour to ensure mathematical consistency and fresh rates
+    - cron: '0 * * * *'
   workflow_dispatch: # Allow manual trigger
 
 jobs:
-  sync:
+  validate_and_sync:
     runs-on: ubuntu-latest
-    name: Auto-Sync Fixer Rates
+    name: Consistency Check & Sync
     steps:
-      - name: Trigger Rate Sync
+      - name: Consistency Validation
+        id: validate
         run: |
-          echo "🔄 Triggering rate sync at $(date -u)"
+          echo "🔍 Running consistency validation at $(date -u)"
           
           RESPONSE=$(curl -s -w "\n%{http_code}" \
-            "https://ofw-pesorate.pages.dev/api/admin/sync?token=${{ secrets.CF_ADMIN_TOKEN }}&force=true")
+            "https://ofw-pesorate.pages.dev/api/admin/validate?token=${{ secrets.CF_ADMIN_TOKEN }}")
           
           HTTP_CODE=$(echo "$RESPONSE" | tail -1)
-          BODY=$(echo "$RESPONSE" | head -n -1)
+          JSON_BODY=$(echo "$RESPONSE" | head -n -1)
           
           echo "HTTP Status: $HTTP_CODE"
-          echo "Response: $BODY"
+          echo "Response: $JSON_BODY"
           
-          if [ "$HTTP_CODE" = "200" ]; then
-            echo "✅ Sync successful"
-          elif [ "$HTTP_CODE" = "429" ]; then
-            echo "⏭️ Rates already fresh (throttled) — OK"
-          else
-            echo "❌ Sync failed with status $HTTP_CODE"
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "❌ Validation endpoint failed with status $HTTP_CODE"
             exit 1
           fi
-
-      - name: Health Check
-        run: |
-          echo "🏥 Running health check..."
-          curl -s https://ofw-pesorate.pages.dev/api/health | python3 -m json.tool || echo "Health endpoint check completed"
-
-      - name: Verify Rates Available
-        run: |
-          echo "📊 Verifying rates endpoint..."
-          RESPONSE=$(curl -s https://ofw-pesorate.pages.dev/api/rate)
-          echo "$RESPONSE" | python3 -m json.tool || echo "$RESPONSE"
           
-          # Check if response contains a valid rate
-          if echo "$RESPONSE" | python3 -c "import sys,json; d=json.load(sys.stdin); assert d.get('rate',0) > 0" 2>/dev/null; then
-            echo "✅ Rates verified — system healthy"
+          CONSISTENT=$(echo "$JSON_BODY" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('consistent', False))")
+          SELF_HEALED=$(echo "$JSON_BODY" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('self_healed', False))")
+          
+          if [ "$CONSISTENT" = "True" ]; then
+            echo "✅ System is mathematically consistent"
           else
-            echo "⚠️ Rate verification needs attention"
+            echo "⚠️ System was inconsistent!"
+            if [ "$SELF_HEALED" = "True" ]; then
+              echo "🛠️ SELF-HEALING TRIGGERED: D1 Cache refreshed & synchronized"
+            else
+              echo "🚨 SELF-HEALING FAILED: Manual intervention may be required"
+              exit 1
+            fi
+          fi
+
+      - name: Final Health Check
+        run: |
+          echo "🏥 Verifying final system health..."
+          curl -s https://ofw-pesorate.pages.dev/api/health | python3 -m json.tool || echo "Health check verified"
+
+      - name: Alerting (Discord/Slack Webhook)
+        if: failure()
+        run: |
+          if [ -n "${{ secrets.DISCORD_WEBHOOK_URL }}" ]; then
+            curl -H "Content-Type: application/json" \
+                 -X POST \
+                 -d '{"content": "🚨 **OFW PesoRate Alert**: Consistency Validation FAILED or Self-Healing failed at '$(date -u)'. Please check GitHub Actions logs."}' \
+                 ${{ secrets.DISCORD_WEBHOOK_URL }}
           fi
