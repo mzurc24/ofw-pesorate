@@ -29,8 +29,8 @@ jobs:
           OUTPUT=$(npx wrangler pages deploy public --project-name=ofw-pesorate)
           echo "$OUTPUT"
           
-          # Extract the deployment URL for testing
-          PREVIEW_URL=$(echo "$OUTPUT" | grep -o 'https://[^"]*\.ofw-pesorate\.pages\.dev')
+          # Extract the deployment URL for testing (only taking the first match to prevent multi-line corruption)
+          PREVIEW_URL=$(echo "$OUTPUT" | grep -o 'https://[^"]*\.ofw-pesorate\.pages\.dev' | head -n 1)
           echo "TEST_URL=$PREVIEW_URL" >> $GITHUB_ENV
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
