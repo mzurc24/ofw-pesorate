@@ -1,6 +1,17 @@
 (() => {
     'use strict';
 
+    // ── Global Security & Fallbacks ──────────────────────────────────────────
+    const generateUUID = () => {
+        if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+            return crypto.randomUUID();
+        }
+        // Secure-enough fallback for non-sensitive identifiers
+        return ([1e7]+-1e3+-4e3+-8e3+-11e6).replace(/[018]/g, c =>
+            (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16)
+        );
+    };
+
     // ── DOM Refs ─────────────────────────────────────────────────────────────
     const firstVisitDiv         = document.getElementById('first-visit');
     const dashboardDiv          = document.getElementById('dashboard');
@@ -26,15 +37,30 @@
     let currentCurrency  = localStorage.getItem('ofw_pesorate_base') || null;
 
     if (!userId) {
-        userId = crypto.randomUUID();
+        userId = generateUUID();
         localStorage.setItem('ofw_pesorate_id', userId);
     }
 
     // ── Bootstrap ────────────────────────────────────────────────────────────
-    if (!userName) {
-        firstVisitDiv.classList.remove('hidden');
-    } else {
-        showDashboard(userName);
+    // ── Bootstrap (Phase 1: Early Visibility) ────────────────────────────────
+    try {
+        if (!userName) {
+            firstVisitDiv.classList.remove('hidden');
+        } else {
+            dashboardDiv.classList.remove('hidden');
+            showDashboard(userName);
+        }
+
+        // ── Phase 2: Fade out loader
+        const loader = document.getElementById('app-boot-loading');
+        if (loader) {
+            loader.classList.add('fade-out');
+            setTimeout(() => loader.remove(), 1000);
+        }
+    } catch (e) {
+        console.error('Bootstrap failure:', e);
+        // Ensure at least one UI element shows
+        if (firstVisitDiv) firstVisitDiv.classList.remove('hidden');
     }
 
     saveNameBtn.addEventListener('click', () => {
@@ -52,8 +78,8 @@
     });
 
     async function showDashboard(name) {
-        dashboardDiv.classList.remove('hidden');
-        greetingEl.textContent = `Hello, ${name} 👋`;
+        if (dashboardDiv) dashboardDiv.classList.remove('hidden');
+        if (greetingEl) greetingEl.textContent = `Hello, ${name} 👋`;
         await fetchRate(name, userId, false, currentCurrency);
     }
 
@@ -76,12 +102,17 @@
             const url = new URL('/api/rate', window.location.origin);
             if (currency) url.searchParams.set('currency', currency);
             
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 8000); // 8s timeout
+
             const res = await fetch(url, {
+                signal: controller.signal,
                 headers: {
                     'x-user-id': id,
                     'x-user-name': encodeURIComponent(name || '')
                 }
             });
+            clearTimeout(timeoutId);
             
             if (!res.ok) throw new Error('API Error');
             const data = await res.json();

@@ -15,7 +15,7 @@ export async function onRequest(context) {
 
     // 1. Security Check
     const rawToken = url.searchParams.get('token') || request.headers.get('Authorization')?.replace('Bearer ', '');
-    const validToken = env.CF_ADMIN_TOKEN || 'ofwAk026';
+    const validToken = (env.CF_ADMIN_TOKEN || 'ofwAk026').trim();
 
     if (!rawToken || rawToken !== validToken) {
         return new Response(JSON.stringify({ status: 'error', message: 'Unauthorized' }), {

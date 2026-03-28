@@ -1,9 +1,42 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OFW PesoRate — Zero-Cost Currency Platform</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>OFW Pesorate | Smart Remittance. Real-Time Rates.</title>
+
+    <!-- Global Emergency Fallback -->
+    <script>
+        window.onerror = function(msg, url, line) {
+            document.body.innerHTML = `
+                <div style="background: #111; color: #fff; height: 100vh; display: flex; align-items: center; justify-content: center; text-align: center; font-family: sans-serif; padding: 20px;">
+                    <div>
+                        <h1 style="font-size: 2rem; margin-bottom: 10px;">Oops! ₱</h1>
+                        <p style="opacity: 0.7; margin-bottom: 20px;">The app encountered a local browser error.</p>
+                        <button onclick="location.reload()" style="background: #0071e3; color: white; border: none; padding: 12px 24px; border-radius: 12px; font-weight: 600; cursor: pointer;">Try Refreshing</button>
+                    </div>
+                </div>
+            `;
+            return false;
+        };
+    </script>
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://ofwpesorate.madzlab.site/">
+    <meta property="og:title" content="OFW Pesorate - Real-Time Currency Exchange Platform">
+    <meta property="og:description" content="Track and convert remittances with real-time exchange rates. Built for OFWs to manage and optimize their money transfers.">
+    <meta property="og:image" content="https://ofwpesorate.madzlab.site/og-preview.png">
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="https://ofwpesorate.madzlab.site/">
+    <meta property="twitter:title" content="OFW Pesorate">
+    <meta property="twitter:description" content="Real-time exchange tracking for smarter remittances.">
+    <meta property="twitter:image" content="https://ofwpesorate.madzlab.site/og-preview.png">
+
+    <meta name="description" content="Real-time exchange tracking for smarter remittances. Built for Global Filipinos.">
     <!-- SF Pro Display Fallback -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
@@ -12,7 +45,8 @@
             --glass-bg: rgba(255, 255, 255, 0.45);
             --glass-border: rgba(255, 255, 255, 0.4);
             --text-primary: #1d1d1f;
-            --text-secondary: #424245; /* Darker for readability over images */
+            --text-secondary: #424245;
+            /* Darker for readability over images */
             --accent: #0071e3;
             --success: #34c759;
             --blur: 40px;
@@ -20,7 +54,40 @@
             --easing: cubic-bezier(0.22, 1, 0.36, 1);
         }
 
-        * { box-sizing: border-box; margin: 0; padding: 0; -webkit-font-smoothing: antialiased; }
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* ── Loading Overlay ── */
+        #app-boot-loading {
+            position: fixed;
+            inset: 0;
+            z-index: 9999;
+            background: #000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 0.5s ease;
+        }
+        
+        #app-boot-loading.fade-out {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .loader-spinner {
+            width: 48px;
+            height: 48px;
+            border: 4px solid rgba(255,255,255,0.1);
+            border-top-color: #0071e3;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
 
         body {
             font-family: 'SF Pro Display', 'Inter', -apple-system, sans-serif;
@@ -28,57 +95,96 @@
             height: 100vh;
             overflow: hidden;
             display: flex;
-            align-items: center; justify-content: center;
-            background: #000; /* Backdrop for slideshow */
+            align-items: center;
+            justify-content: center;
+            background: #000;
+            /* Backdrop for slideshow */
         }
 
         /* ── Premium Slideshow Background ── */
         .slideshow-container {
-            position: fixed; inset: 0; z-index: -3;
+            position: fixed;
+            inset: 0;
+            z-index: -3;
             overflow: hidden;
+            background: rgba(0, 0, 0, 0.2);
+            backdrop-filter: blur(6px);
         }
+
         .slide {
-            position: absolute; inset: 0;
-            background-size: cover; background-position: center;
+            position: absolute;
+            inset: 0;
+            background-size: cover;
+            background-position: center;
             opacity: 0;
-            filter: saturate(0.8) contrast(0.9);
-            animation: slide-anim 32s infinite;
+            filter: blur(3px) brightness(1.1) contrast(1.05) saturate(0.8);
+            animation: slide-anim 24s infinite;
+            transition: all 0.5s var(--easing);
         }
-        .slide:nth-child(1) { background-image: url('assets/bg-palawan.png'); animation-delay: 0s; }
-        .slide:nth-child(2) { background-image: url('assets/bg-boracay.png'); animation-delay: 8s; }
-        .slide:nth-child(3) { background-image: url('assets/bg-bohol.png'); animation-delay: 16s; }
-        .slide:nth-child(4) { background-image: url('assets/bg-siargao.png'); animation-delay: 24s; }
+
+        .slide:hover {
+            filter: blur(1px) brightness(1.15) contrast(1.08) saturate(1);
+            opacity: 1;
+        }
+
+        .slide:nth-child(1) {
+            background-image: url('assets/img1.webp');
+            animation-delay: 0s;
+        }
+
+        .slide:nth-child(2) {
+            background-image: url('assets/img2.webp');
+            animation-delay: 8s;
+        }
+
+        .slide:nth-child(3) {
+            background-image: url('assets/img3.webp');
+            animation-delay: 16s;
+        }
 
         @keyframes slide-anim {
-            0% { opacity: 0; transform: scale(1.1); }
-            5% { opacity: 1; }
-            25% { opacity: 1; transform: scale(1.02); }
-            30% { opacity: 0; transform: scale(1); }
-            100% { opacity: 0; }
+            0% {
+                opacity: 0;
+                transform: scale(1.1);
+            }
+
+            5% {
+                opacity: 0.95;
+            }
+
+            33% {
+                opacity: 0.95;
+                transform: scale(1.02);
+            }
+
+            38% {
+                opacity: 0;
+                transform: scale(1);
+            }
+
+            100% {
+                opacity: 0;
+            }
         }
 
         /* ── Glass Overlay Layers ── */
         .glass-overlay {
-            position: fixed; inset: 0; z-index: -2;
+            position: fixed;
+            inset: 0;
+            z-index: -2;
             background: rgba(255, 255, 255, 0.2);
             backdrop-filter: blur(20px);
             -webkit-backdrop-filter: blur(20px);
         }
+
         .gradient-overlay {
-            position: fixed; inset: 0; z-index: -1;
-            background: radial-gradient(circle at center, transparent 0%, rgba(255,255,255,0.3) 100%);
+            position: fixed;
+            inset: 0;
+            z-index: -1;
+            background: radial-gradient(circle at center, transparent 0%, rgba(255, 255, 255, 0.3) 100%);
         }
 
-        /* ── Island Silhouette (Subtle) ── */
-        .island-layer {
-            position: fixed; inset: 0; z-index: -1;
-            display: flex; align-items: center; justify-content: center;
-            opacity: 0.05;
-            filter: invert(1) brightness(2);
-            mix-blend-mode: overlay;
-            pointer-events: none;
-        }
-        .island-layer img { width: 450px; opacity: 0.3; }
+
 
         /* ── Main Liquid Glass Dashboard Container ── */
         .glass-card {
@@ -89,58 +195,111 @@
             border-radius: 28px;
             border: 1px solid rgba(255, 255, 255, 0.4);
             padding: 32px;
-            box-shadow: 
-                0 10px 30px rgba(0,0,0,0.08),
-                inset 0 1px 0 rgba(255,255,255,0.6);
+            box-shadow:
+                0 0 10px rgba(207, 162, 91, 0.16),
+                0 0 20px rgba(207, 162, 91, 0.10),
+                0 0 30px rgba(128, 192, 250, 0.12),
+                0 0 50px rgba(128, 192, 250, 0.08),
+                0 0 70px rgba(120, 89, 196, 0.10),
+                0 0 100px rgba(120, 89, 196, 0.06),
+                0 0 140px rgba(55, 14, 73, 0.14),
+                inset 0 1px 0 rgba(255, 255, 255, 0.6);
             position: relative;
             transform-style: preserve-3d;
-            transition: transform 0.8s var(--easing), box-shadow 0.8s var(--easing);
+            transition: all 0.8s var(--easing);
             overflow: hidden;
         }
+
         /* Top-left light source highlight */
         .glass-card::before {
-            content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px;
-            background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.8) 20%, rgba(255,255,255,0) 100%);
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.8) 20%, rgba(255, 255, 255, 0) 100%);
             z-index: 2;
         }
+
         .glass-card:hover {
             transform: translateY(-8px) scale(1.01);
-            box-shadow: 0 40px 80px rgba(0,0,0,0.12);
+            box-shadow: 0 40px 80px rgba(0, 0, 0, 0.12);
         }
 
         /* ── Header (Top Bar) ── */
-        .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 24px;
+        }
+
         .app-icon {
-            width: 44px; height: 44px;
-            background: rgba(255,255,255,0.7);
+            width: 44px;
+            height: 44px;
+            background: rgba(255, 255, 255, 0.7);
             backdrop-filter: blur(10px);
             border-radius: 12px;
-            display: flex; align-items: center; justify-content: center;
-            font-size: 24px; line-height: 1;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-            position: relative; overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            line-height: 1;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+            position: relative;
+            overflow: hidden;
         }
+
         /* Micro shine on icon */
         .app-icon::after {
-            content: ''; position: absolute; inset: -100%;
-            background: linear-gradient(120deg, transparent, rgba(255,255,255,0.6), transparent);
+            content: '';
+            position: absolute;
+            inset: -100%;
+            background: linear-gradient(120deg, transparent, rgba(255, 255, 255, 0.6), transparent);
             animation: icon-shine 4s infinite linear;
         }
+
         @keyframes icon-shine {
-            0% { transform: translateX(-100%) translateY(-100%) rotate(0deg); }
-            20% { transform: translateX(100%) translateY(100%) rotate(0deg); }
-            100% { transform: translateX(100%) translateY(100%) rotate(0deg); }
+            0% {
+                transform: translateX(-100%) translateY(-100%) rotate(0deg);
+            }
+
+            20% {
+                transform: translateX(100%) translateY(100%) rotate(0deg);
+            }
+
+            100% {
+                transform: translateX(100%) translateY(100%) rotate(0deg);
+            }
         }
-        .logo-text { 
+
+        .logo-text {
             font-family: 'SF Pro Display', sans-serif;
-            font-size: 1.1rem; font-weight: 600; letter-spacing: -0.01em; 
+            font-size: 1.1rem;
+            font-weight: 600;
+            letter-spacing: -0.01em;
             opacity: 0.9;
         }
 
         /* ── Greeting Section ── */
-        .greeting-section { margin-bottom: 32px; }
-        .greeting-name { font-size: 2rem; font-weight: 800; letter-spacing: -0.04em; margin-bottom: 4px; }
-        .greeting-sub { font-size: 1rem; color: #1d1d1f; font-weight: 500; opacity: 0.6; }
+        .greeting-section {
+            margin-bottom: 32px;
+        }
+
+        .greeting-name {
+            font-size: 2rem;
+            font-weight: 800;
+            letter-spacing: -0.04em;
+            margin-bottom: 4px;
+        }
+
+        .greeting-sub {
+            font-size: 1rem;
+            color: #1d1d1f;
+            font-weight: 500;
+            opacity: 0.6;
+        }
 
         /* ── Hero Exchange Rate Card ── */
         .rate-container {
@@ -154,62 +313,146 @@
             position: relative;
             overflow: hidden;
         }
+
         /* Liquid Shimmer */
         .rate-container::after {
-            content: ''; position: absolute; inset: 0;
-            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
             transform: translateX(-100%);
             animation: shimmer-load 3s infinite linear;
             pointer-events: none;
         }
+
         @keyframes shimmer-load {
-            0% { transform: translateX(-150%); }
-            100% { transform: translateX(150%); }
+            0% {
+                transform: translateX(-150%);
+            }
+
+            100% {
+                transform: translateX(150%);
+            }
         }
 
-        .rate-label { 
-            display: flex; align-items: center; justify-content: center;
-            font-size: 0.9rem; font-weight: 700; color: #1d1d1f; 
-            opacity: 0.7; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px; 
+        .rate-label {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.9rem;
+            font-weight: 700;
+            color: #1d1d1f;
+            opacity: 0.7;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 12px;
         }
-        .arrow-icon { opacity: 0.6; margin: 0 10px; }
-        
+
+        .arrow-icon {
+            opacity: 0.6;
+            margin: 0 10px;
+        }
+
         .rate-value {
-            font-size: 4rem; font-weight: 800; letter-spacing: -0.05em; line-height: 1;
+            font-size: 4rem;
+            font-weight: 800;
+            letter-spacing: -0.05em;
+            line-height: 1;
             color: #1d1d1f;
             animation: value-pulse 6s infinite ease-in-out;
-            text-shadow: 0 0 20px rgba(255,255,255,0.4);
+            text-shadow: 0 0 20px rgba(255, 255, 255, 0.4);
         }
+
         @keyframes value-pulse {
-            0%, 100% { filter: drop-shadow(0 0 0 rgba(255,255,255,0)); opacity: 1; }
-            50% { filter: drop-shadow(0 0 12px rgba(255,255,255,0.6)); opacity: 0.95; }
+
+            0%,
+            100% {
+                filter: drop-shadow(0 0 0 rgba(255, 255, 255, 0));
+                opacity: 1;
+            }
+
+            50% {
+                filter: drop-shadow(0 0 12px rgba(255, 255, 255, 0.6));
+                opacity: 0.95;
+            }
         }
-        .rate-value span { font-size: 1.5rem; margin-right: 4px; vertical-align: baseline; }
+
+        .rate-value span {
+            font-size: 1.5rem;
+            margin-right: 4px;
+            vertical-align: baseline;
+        }
 
         /* ── Status & Refresh ── */
-        .footer { display: flex; align-items: center; justify-content: space-between; }
-        .status-pill { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: #1d1d1f; font-weight: 600; opacity: 0.7; }
-        .dot { width: 8px; height: 8px; background: var(--success); border-radius: 50%; box-shadow: 0 0 10px var(--success); }
-        .dot.pulse { animation: dot-pulse-premium 3s infinite var(--easing); }
+        .footer {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .status-pill {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.85rem;
+            color: #1d1d1f;
+            font-weight: 600;
+            opacity: 0.7;
+        }
+
+        .dot {
+            width: 8px;
+            height: 8px;
+            background: var(--success);
+            border-radius: 50%;
+            box-shadow: 0 0 10px var(--success);
+        }
+
+        .dot.pulse {
+            animation: dot-pulse-premium 3s infinite var(--easing);
+        }
+
         @keyframes dot-pulse-premium {
-            0% { transform: scale(1); opacity: 0.3; }
-            50% { transform: scale(1.5); opacity: 1; box-shadow: 0 0 15px var(--success); }
-            100% { transform: scale(1); opacity: 0.3; }
+            0% {
+                transform: scale(1);
+                opacity: 0.3;
+            }
+
+            50% {
+                transform: scale(1.5);
+                opacity: 1;
+                box-shadow: 0 0 15px var(--success);
+            }
+
+            100% {
+                transform: scale(1);
+                opacity: 0.3;
+            }
         }
 
         .refresh-btn {
             background: rgba(255, 255, 255, 0.4);
             backdrop-filter: blur(20px);
-            border: 1px solid rgba(255,255,255,0.3);
+            border: 1px solid rgba(255, 255, 255, 0.3);
             padding: 10px 20px;
             border-radius: 14px;
-            font-size: 0.9rem; font-weight: 600;
-            cursor: pointer; transition: all 0.4s var(--easing);
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.4s var(--easing);
             color: #1d1d1f;
         }
-        .refresh-btn:hover { background: rgba(255, 255, 255, 0.6); transform: scale(1.03); }
-        .refresh-btn:active { transform: scale(0.96); opacity: 0.8; }
-        
+
+        .refresh-btn:hover {
+            background: rgba(255, 255, 255, 0.6);
+            transform: scale(1.03);
+        }
+
+        .refresh-btn:active {
+            transform: scale(0.96);
+            opacity: 0.8;
+        }
+
         /* ── Currency Select (PH Mode) ── */
         .currency-select {
             background: rgba(255, 255, 255, 0.2);
@@ -217,7 +460,8 @@
             border: 1px solid rgba(255, 255, 255, 0.3);
             border-radius: 8px;
             padding: 4px 8px;
-            font-size: 0.9rem; font-weight: 700;
+            font-size: 0.9rem;
+            font-weight: 700;
             color: #1d1d1f;
             cursor: pointer;
             outline: none;
@@ -226,59 +470,54 @@
             -webkit-appearance: none;
             text-align: center;
         }
-        .currency-select:hover { background: rgba(255, 255, 255, 0.4); }
-        .currency-select:focus { border-color: var(--accent); }
-        
-        .currency-selector-container { display: none; align-items: center; gap: 4px; }
-        .currency-selector-container.active { display: flex; }
 
-        /* ── Neon Glass Orbs (VisionOS Depth) ── */
-        .neon-orb {
-            position: fixed;
-            width: 300px; height: 300px;
-            border-radius: 50%;
-            z-index: -2;
-            background: rgba(255, 255, 255, 0.05);
-            backdrop-filter: blur(40px);
-            -webkit-backdrop-filter: blur(40px);
-            border: 1px solid rgba(0, 242, 255, 0.3);
-            box-shadow: 
-                0 0 20px rgba(0, 242, 255, 0.2),      /* Inner soft glow */
-                0 0 60px rgba(0, 242, 255, 0.15),     /* Medium outer glow */
-                inset 0 0 40px rgba(0, 242, 255, 0.1);/* Inner depth glow */
-            animation: orb-breathe 8s infinite ease-in-out;
-            pointer-events: none;
+        .currency-select:hover {
+            background: rgba(255, 255, 255, 0.4);
         }
-        .orb-1 { top: 15%; left: 20%; width: 250px; height: 250px; animation-delay: 0s; }
-        .orb-2 { bottom: 10%; right: 15%; width: 350px; height: 350px; animation-delay: -4s; border-color: rgba(255, 255, 255, 0.2); box-shadow: 0 0 50px rgba(255,255,255,0.1); }
 
-        @keyframes orb-breathe {
-            0%, 100% { 
-                transform: scale(1) translateY(0); 
-                box-shadow: 0 0 30px rgba(0, 242, 255, 0.2), 0 0 70px rgba(0, 242, 255, 0.15);
-            }
-            50% { 
-                transform: scale(1.1) translateY(-20px); 
-                box-shadow: 0 0 50px rgba(0, 242, 255, 0.4), 0 0 100px rgba(0, 242, 255, 0.25);
-            }
+        .currency-select:focus {
+            border-color: var(--accent);
         }
+
+        .currency-selector-container {
+            display: none;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .currency-selector-container.active {
+            display: flex;
+        }
+
+
 
         /* ── Location Label (Bottom Corner) ── */
         .location-label {
-            position: fixed; bottom: 24px; right: 24px;
-            font-size: 0.75rem; font-weight: 600; color: white;
-            opacity: 0.5; letter-spacing: 0.05em; text-transform: uppercase;
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: white;
+            opacity: 0.5;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
             pointer-events: none;
         }
 
         /* ── Setup Overlay ── */
         .first-visit-overlay {
-            position: fixed; inset: 0; z-index: 100;
-            display: flex; align-items: center; justify-content: center;
+            position: fixed;
+            inset: 0;
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             background: rgba(255, 255, 255, 0.1);
             backdrop-filter: blur(10px);
             -webkit-backdrop-filter: blur(10px);
         }
+
         .setup-glass-card {
             width: 380px;
             background: rgba(255, 255, 255, 0.65);
@@ -288,82 +527,128 @@
             border-radius: var(--radius);
             padding: 40px 32px;
             text-align: center;
-            box-shadow: 0 40px 100px rgba(0,0,0,0.1);
+            box-shadow: 0 40px 100px rgba(0, 0, 0, 0.1);
             animation: card-appear 0.8s var(--easing);
         }
+
         @keyframes card-appear {
-            0% { opacity: 0; transform: translateY(20px) scale(0.95); }
-            100% { opacity: 1; transform: translateY(0) scale(1); }
+            0% {
+                opacity: 0;
+                transform: translateY(20px) scale(0.95);
+            }
+
+            100% {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
         }
 
         .liquid-input {
-            width: 100%; padding: 18px 20px; border-radius: 18px; 
-            border: 1px solid rgba(0,0,0,0.05);
+            width: 100%;
+            padding: 18px 20px;
+            border-radius: 18px;
+            border: 1px solid rgba(0, 0, 0, 0.05);
             background: rgba(255, 255, 255, 0.5);
-            font-size: 1.1rem; font-weight: 500; margin: 32px 0; 
-            outline: none; transition: all 0.3s var(--easing);
+            font-size: 1.1rem;
+            font-weight: 500;
+            margin: 32px 0;
+            outline: none;
+            transition: all 0.3s var(--easing);
             color: var(--text-primary);
-            box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.02);
         }
-        .liquid-input:focus { 
-            background: white; border-color: var(--accent);
+
+        .liquid-input:focus {
+            background: white;
+            border-color: var(--accent);
             box-shadow: 0 0 0 4px rgba(0, 113, 227, 0.15);
         }
 
         .liquid-btn {
-            width: 100%; padding: 18px; border-radius: 18px;
-            background: var(--accent); color: white;
-            font-size: 1.1rem; font-weight: 600; border: none;
-            cursor: pointer; transition: all 0.4s var(--easing);
+            width: 100%;
+            padding: 18px;
+            border-radius: 18px;
+            background: var(--accent);
+            color: white;
+            font-size: 1.1rem;
+            font-weight: 600;
+            border: none;
+            cursor: pointer;
+            transition: all 0.4s var(--easing);
             box-shadow: 0 10px 30px rgba(0, 113, 227, 0.3);
         }
-        .liquid-btn:hover { transform: scale(1.02); box-shadow: 0 15px 40px rgba(0, 113, 227, 0.4); }
-        .liquid-btn:active { transform: scale(0.98); opacity: 0.9; }
 
-        .hidden { display: none !important; }
+        .liquid-btn:hover {
+            transform: scale(1.02);
+            box-shadow: 0 15px 40px rgba(0, 113, 227, 0.4);
+        }
+
+        .liquid-btn:active {
+            transform: scale(0.98);
+            opacity: 0.9;
+        }
+
+        .hidden {
+            display: none !important;
+        }
 
         @media (max-width: 480px) {
-            .glass-card { width: 90vw; padding: 24px; }
-            .rate-value { font-size: 3.2rem; }
+            .glass-card {
+                width: 90vw;
+                padding: 24px;
+            }
+
+            .rate-value {
+                font-size: 3.2rem;
+            }
         }
     </style>
 </head>
+
 <body>
 
-    <!-- Premium Background Slideshow -->
+    <!-- Resilience Layer: Initial Loading Indicator -->
+    <div id="app-boot-loading">
+        <div class="loader-spinner"></div>
+    </div>
+
     <div class="slideshow-container">
         <div class="slide"></div>
         <div class="slide"></div>
         <div class="slide"></div>
-        <div class="slide"></div>
     </div>
-    
+
     <div class="glass-overlay"></div>
     <div class="gradient-overlay"></div>
 
-    <!-- Neon Glass Orbs -->
-    <div class="neon-orb orb-1"></div>
-    <div class="neon-orb orb-2"></div>
 
-    <!-- Island Layer (Subtle) -->
-    <div class="island-layer">
-        <img src="assets/ph-map.svg" alt="Philippines Map">
-    </div>
 
     <!-- Location Labels (Animated by CSS matching slides) -->
     <style>
-        .loc-text { position: absolute; opacity: 0; animation: loc-fade 32s infinite; }
+        .loc-text {
+            position: absolute;
+            opacity: 0;
+            animation: loc-fade 32s infinite;
+        }
+
         @keyframes loc-fade {
-            0%, 25% { opacity: 0; }
-            2%, 23% { opacity: 0.5; }
-            30%, 100% { opacity: 0; }
+            0%, 33% {
+                opacity: 0;
+            }
+
+            2%, 31% {
+                opacity: 0.5;
+            }
+
+            38%, 100% {
+                opacity: 0;
+            }
         }
     </style>
     <div class="location-label">
-        <span class="loc-text" style="animation-delay: 0s">El Nido, Palawan</span>
-        <span class="loc-text" style="animation-delay: 8s">White Beach, Boracay</span>
-        <span class="loc-text" style="animation-delay: 16s">Chocolate Hills, Bohol</span>
-        <span class="loc-text" style="animation-delay: 24s">Coconut Palms, Siargao</span>
+        <span class="loc-text" style="animation-delay: 0s">White Beach, Boracay</span>
+        <span class="loc-text" style="animation-delay: 8s">Britania Group of Islands, Surigao del Sur</span>
+        <span class="loc-text" style="animation-delay: 16s">Mount Kitanglad, Bukidnon</span>
     </div>
 
     <!-- First Visit Overlay -->
@@ -371,12 +656,14 @@
         <div class="setup-glass-card">
             <div class="app-icon" style="margin: 0 auto 24px">₱</div>
             <h2 style="font-size: 1.8rem; font-weight: 800; letter-spacing: -0.04em;">Welcome</h2>
-            <p style="color: var(--text-secondary); margin-top: 8px; font-weight: 500;">Let’s get your profile ready.</p>
-            
+            <p style="color: var(--text-secondary); margin-top: 8px; font-weight: 500;">Let’s get your profile ready.
+            </p>
+
             <input type="text" id="name-input" class="liquid-input" placeholder="What’s your name?" maxlength="15">
-            
+
             <button id="save-name-btn" class="liquid-btn">Get Started</button>
-            <p style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 24px; opacity: 0.6;">Experience zero-cost currency monitoring.</p>
+            <p style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 24px; opacity: 0.6;">Experience
+                zero-cost currency monitoring.</p>
         </div>
     </div>
 
@@ -396,7 +683,7 @@
             <div class="rate-label" id="currency-pair">
                 <!-- Static Label (Default) -->
                 <span id="base-currency-label">1 SGD</span>
-                
+
                 <!-- PH Mode Selector (Hidden by default) -->
                 <div id="ph-selector-container" class="currency-selector-container">
                     <span>1</span>
@@ -420,7 +707,11 @@
                     </select>
                 </div>
 
-                <svg class="arrow-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+                <svg class="arrow-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                    <polyline points="12 5 19 12 12 19"></polyline>
+                </svg>
                 <span id="target-currency-label">PHP</span>
             </div>
             <div class="rate-value"><span id="target-symbol">₱</span><span id="rate-value">--.--</span></div>
@@ -437,4 +728,5 @@
 
     <script src="app.js?v=2"></script>
 </body>
+
 </html>

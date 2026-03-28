@@ -43,7 +43,7 @@ export async function onRequest(context) {
     const { request, env } = context;
     const url = new URL(request.url);
     const rawToken = url.searchParams.get('token') || request.headers.get('Authorization')?.replace('Bearer ', '');
-    const validToken = env.CF_ADMIN_TOKEN || 'ofwAk026';
+    const validToken = (env.CF_ADMIN_TOKEN || 'ofwAk026').trim();
 
     if (!rawToken || rawToken !== validToken) {
         return new Response(JSON.stringify({ status: 'error', message: 'Unauthorized' }), {

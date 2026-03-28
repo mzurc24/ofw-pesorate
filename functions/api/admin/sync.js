@@ -30,7 +30,7 @@ export async function onRequest(context) {
 
   // 1. Security Check
   const rawToken = url.searchParams.get('token') || request.headers.get('Authorization')?.replace('Bearer ', '');
-  const validToken = env.CF_ADMIN_TOKEN || 'ofwAk026';
+  const validToken = (env.CF_ADMIN_TOKEN || 'ofwAk026').trim();
 
   if (!rawToken || rawToken !== validToken) {
     return new Response(JSON.stringify({ status: 'error', message: 'Unauthorized' }), {
@@ -68,7 +68,7 @@ export async function onRequest(context) {
     }
 
     // 3. Fetch from Fixer with retry
-    const apiKey = env.CF_FIXER_KEY || 'c056294df71360e7b8e84205ef080e47';
+    const apiKey = env.CF_FIXER_KEY;
     const baseUrl = 'http://data.fixer.io/api/latest';
     
     const response = await fetchWithRetry(`${baseUrl}?access_key=${apiKey}`);
@@ -97,15 +97,21 @@ export async function onRequest(context) {
     if (env.DB) {
       try {
         await env.DB.prepare("REPLACE INTO rates_cache (base_currency, rates_json, updated_at) VALUES ('EUR', ?, ?)").bind(ratesJson, now).run();
+        
+        // Secondary writes (non-fatal for main sync success)
         try {
           await env.DB.prepare("REPLACE INTO settings (key, value) VALUES ('last_fixer_fetch', ?)").bind(now.toString()).run();
           await env.DB.prepare("INSERT INTO api_logs (endpoint, status) VALUES (?, ?)").bind("/api/admin/sync", "success").run();
-        } catch(e) { console.error('Secondary write failed', e); }
+        } catch(e) { 
+          console.error('Secondary write failed (non-fatal):', e.message); 
+        }
       } catch (writeErr) {
-         console.error('D1 Write Failed:', writeErr.message);
+         console.error('CRITICAL D1 Write Failed:', writeErr.message);
          try {
            await env.DB.prepare("INSERT INTO api_logs (endpoint, status) VALUES (?, ?)").bind("/api/admin/sync", "fail_write").run();
          } catch(e) {}
+         // Re-throw to return error response
+         throw new Error(`Database Write Failed: ${writeErr.message}`);
       }
     }
 

@@ -4,9 +4,12 @@
   "description": "Zero-Cost Currency Conversion Platform",
   "scripts": {
     "dev": "wrangler pages dev public --local --d1 DB=c1e1c1e1-c1e1-c1e1-c1e1-c1e1c1e1c1e1",
-    "deploy": "wrangler pages deploy public"
+    "deploy": "wrangler pages deploy public --branch=production --commit-dirty=true"
   },
   "devDependencies": {
+    "dotenv": "^17.3.1",
+    "node-fetch": "^3.3.2",
+    "puppeteer": "^24.40.0",
     "wrangler": "^4.76.0"
   }
 }

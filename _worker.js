@@ -16,7 +16,7 @@ export default {
      */
     async scheduled(event, env, ctx) {
         console.log("CRON: Hourly system-wide sync triggered...");
-        const apiKey = env.FIXER_API_KEY || env.CF_FIXER_KEY;
+        const apiKey = (env.FIXER_API_KEY || env.CF_FIXER_KEY || "").trim();
         const fixerUrl = `http://data.fixer.io/api/latest?access_key=${apiKey}`;
 
         ctx.waitUntil((async () => {
@@ -68,7 +68,7 @@ async function handleRatesRequest(url, request, env, ctx) {
 
     // 2. Smart Fetch Layer: Single-Flight + 3x Retry (Phase 3 & 4)
     if (!pendingFetch) {
-        const apiKey = env.FIXER_API_KEY || env.CF_FIXER_KEY;
+        const apiKey = (env.FIXER_API_KEY || env.CF_FIXER_KEY || "").trim();
         const fixerUrl = `http://data.fixer.io/api/latest?access_key=${apiKey}`;
         pendingFetch = fetchFixerWithRetry(fixerUrl);
         ctx.waitUntil(pendingFetch.finally(() => { pendingFetch = null; }));

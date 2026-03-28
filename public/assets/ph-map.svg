@@ -1,8 +1,0 @@
-<svg viewBox="0 0 400 600" xmlns="http://www.w3.org/2000/svg">
-    <!-- Simplified Philippines Map Silhouette -->
-    <path d="M180,50 L220,60 L240,100 L230,150 L200,200 L160,220 L140,180 L150,100 Z" fill="currentColor" /> <!-- Luzon-ish -->
-    <path d="M220,250 L260,260 L280,300 L260,350 L220,360 L180,340 Z" fill="currentColor" /> <!-- Visayas-ish -->
-    <path d="M200,400 L280,420 L320,480 L300,550 L200,580 L140,540 L120,480 Z" fill="currentColor" /> <!-- Mindanao-ish -->
-    <!-- Palawan-ish -->
-    <path d="M80,280 L120,380 L110,400 L70,300 Z" fill="currentColor" />
-</svg>
