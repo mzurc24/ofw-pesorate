@@ -37,7 +37,7 @@ async function verifyRegion(browser, region) {
         // Go to URL and wait until network is mostly idle
         const response = await page.goto(TEST_URL, { waitUntil: 'networkidle2', timeout: 30000 });
         
-        if (!response.ok()) {
+        if (!response.ok() && response.status() !== 304) {
             throw new Error(`HTTP Error: ${response.status()}`);
         }
 
