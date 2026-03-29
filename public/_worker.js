@@ -44,24 +44,31 @@ export default {
     }
 
     // ══════════════════════════════════════════════════════════════════════
-    // ROUTE: API Admin Sync (Manual Sync Button)
+    // ROUTE: API Admin System (Auth & Health Check)
     // ══════════════════════════════════════════════════════════════════════
-    if (path === '/api/admin/sync') {
-      if (request.method !== 'POST') return new Response('Method Not Allowed', { status: 405 });
-      return await handleManualSync(request, env);
+    if (path === '/api/admin/system' || path === '/api/admin/system/') {
+        return Response.json({ status: 'success', api: 'HEALTHY', db: 'HEALTHY' });
     }
 
     // ══════════════════════════════════════════════════════════════════════
     // ROUTE: API Social (Resilient zero-traffic health)
     // ══════════════════════════════════════════════════════════════════════
-    if (path === '/api/social') {
+    if (path.startsWith('/api/social')) {
       return await handleSocialAPI(env);
+    }
+
+    // ══════════════════════════════════════════════════════════════════════
+    // ROUTE: API Admin Sync (Manual Sync Button)
+    // ══════════════════════════════════════════════════════════════════════
+    if (path === '/api/admin/sync' || path === '/api/admin/sync/') {
+      if (request.method !== 'POST') return new Response('Method Not Allowed', { status: 405 });
+      return await handleManualSync(request, env);
     }
 
     // ══════════════════════════════════════════════════════════════════════
     // ROUTE: API Admin Reset (Circuit Breaker)
     // ══════════════════════════════════════════════════════════════════════
-    if (path === '/api/admin/reset_breaker') {
+    if (path.startsWith('/api/admin/reset_breaker')) {
         await env.DB.batch([
             env.DB.prepare("REPLACE INTO settings (key, value) VALUES ('td_fail_count', '0')"),
             env.DB.prepare("REPLACE INTO settings (key, value) VALUES ('td_disabled_until', '0')"),
