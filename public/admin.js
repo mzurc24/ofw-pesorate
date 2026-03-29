@@ -45,9 +45,12 @@
     const tooltipValue         = $('tooltip-value');
     const tooltipChange        = $('tooltip-change');
 
-    // Log
-    const logPanel   = $('log-panel');
-    const logCount   = $('log-count');
+    // DevOps monitor
+    const devopsVerdict   = $('devops-verdict');
+    const metricsLatency  = $('metrics-latency');
+    const metricsBudget   = $('metrics-budget');
+    const devopsAlerts    = $('devops-alerts');
+    const auditHistory    = $('audit-history');
 
     // ══════════════════════════════════════════════════════════════════════
     // STATE
@@ -252,8 +255,9 @@
 
     async function refreshAll() {
         try {
-            // Separate Social Init (Decoupled from blocking chain)
+            // Separate Social & DevOps Init (Decoupled from blocking chain)
             fetchSocialData();
+            fetchDevOpsStatus();
 
             const [systemData, metricsData] = await Promise.all([
                 fetchWithRetry('/api/admin/system', { headers: authHeaders() }),
@@ -489,6 +493,60 @@
                         <div class="bar-fill" style="width:${pct}%;background:${meta.grad}"></div>
                     </div>
                     <div class="bar-value">${p.clicks || 0}</div>
+                </div>`;
+            }).join('');
+        }
+    }
+
+    // ══════════════════════════════════════════════════════════════════════
+    // RENDER: DevOps Engine
+    // ══════════════════════════════════════════════════════════════════════
+    async function fetchDevOpsStatus() {
+        try {
+            const data = await fetchWithRetry('/api/admin/devops', { headers: authHeaders() });
+            if (data && !data._failed) {
+                renderDevOps(data);
+            }
+        } catch (e) {
+            console.warn('DevOps fetch failed:', e);
+        }
+    }
+
+    function renderDevOps(data) {
+        if (!devopsVerdict || !metricsLatency || !metricsBudget) return;
+
+        // 1. Verdict & Status
+        const statusColors = { HEALTHY: '#22c55e', DEGRADED: '#f59e0b', DOWN: '#ef4444' };
+        devopsVerdict.textContent = data.status || 'UNKNOWN';
+        devopsVerdict.style.color = statusColors[data.status] || '#94a3b8';
+        devopsVerdict.style.backgroundColor = `${statusColors[data.status]}15`;
+        devopsVerdict.style.borderColor = `${statusColors[data.status]}30`;
+
+        // 2. Metrics
+        metricsLatency.textContent = `${data.findings.performance.avg_latency_1h || '--'} ms`;
+        metricsBudget.textContent = `${data.findings.twelve_data.credits_left} left`;
+
+        // 3. Alerts
+        devopsAlerts.innerHTML = '';
+        if (data.findings.alerts?.length) {
+            data.findings.alerts.forEach(alert => {
+                const div = document.createElement('div');
+                div.className = 'p-2 rounded-lg bg-red-500/10 border border-red-500/20 text-[10px] text-red-200 flex items-center gap-2';
+                div.innerHTML = `<span>⚠️</span> ${alert}`;
+                devopsAlerts.appendChild(div);
+            });
+        } else {
+            devopsAlerts.innerHTML = '<p class="text-[10px] text-green-400 font-medium">✨ All systems nominal</p>';
+        }
+
+        // 4. Audit History
+        if (auditHistory && data.findings.audit_history) {
+            auditHistory.innerHTML = data.findings.audit_history.map(a => {
+                const color = statusColors[a.status] || '#94a3b8';
+                const time = new Date(a.timestamp).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
+                return `<div class="flex justify-between items-center py-1 border-b border-white/5 last:border-0">
+                    <span style="color:${color}">● ${a.status}</span>
+                    <span class="opacity-40">${time}</span>
                 </div>`;
             }).join('');
         }

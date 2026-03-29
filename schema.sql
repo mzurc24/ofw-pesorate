@@ -104,3 +104,14 @@ CREATE TABLE IF NOT EXISTS healing_logs (
 );
 
 CREATE INDEX IF NOT EXISTS idx_healing_logs_timestamp ON healing_logs(timestamp);
+
+-- devops_audit: Track hourly health checks and automated decisions
+CREATE TABLE IF NOT EXISTS devops_audit (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    status TEXT NOT NULL, -- HEALTHY, DEGRADED, DOWN
+    findings_json TEXT, -- Aggregated analysis results
+    actions_taken TEXT, -- Maintenance tasks executed
+    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_devops_audit_timestamp ON devops_audit(timestamp);

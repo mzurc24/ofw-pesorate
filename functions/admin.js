@@ -698,7 +698,36 @@ export async function onRequest(context) {
                         <h2>📈 Conversion Rates</h2>
                         <span style="font-size: 0.75rem; color: var(--text-muted)">by country</span>
                     </div>
-                    <div class="card-body" id="conversion-rates-body">
+                    <!-- System Health & Status -->
+                    <div class="card p-6 rounded-2xl border border-white/10" id="devops-card">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-lg font-semibold flex items-center gap-2">
+                                <span class="w-2 h-2 rounded-full bg-blue-400 animate-pulse"></span>
+                                DevOps Engine Monitor
+                            </h3>
+                            <span id="devops-verdict" class="px-3 py-1 rounded-full text-xs font-bold bg-white/5 border border-white/10">Scanning...</span>
+                        </div>
+                        <div id="devops-content" class="space-y-4">
+                            <div class="grid grid-cols-2 gap-4">
+                                <div class="p-3 rounded-xl bg-white/5 border border-white/10">
+                                    <p class="text-[10px] text-white/40 uppercase font-bold tracking-wider mb-1">Avg Latency (1h)</p>
+                                    <p class="text-xl font-bold font-mono" id="metrics-latency">--</p>
+                                </div>
+                                <div class="p-3 rounded-xl bg-white/5 border border-white/10">
+                                    <p class="text-[10px] text-white/40 uppercase font-bold tracking-wider mb-1">Daily Budget</p>
+                                    <p class="text-xl font-bold font-mono" id="metrics-budget">--</p>
+                                </div>
+                            </div>
+                            <div id="devops-alerts" class="space-y-2"></div>
+                            <div class="border-t border-white/10 pt-4 mt-4">
+                                <p class="text-[10px] text-white/40 uppercase font-bold tracking-wider mb-2">Audit History (Last 5 Checks)</p>
+                                <div id="audit-history" class="space-y-1 font-mono text-[10px]"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Sync Controls -->
+                    <div class="card p-6 rounded-2xl border border-white/10">
                         <div class="skeleton skeleton-chart"></div>
                     </div>
                 </div>
