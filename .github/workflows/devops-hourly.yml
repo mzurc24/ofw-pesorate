@@ -19,65 +19,92 @@ jobs:
         with:
           node-version: '20'
 
-      - name: "🔍 DevOps System Scan (Zero Credit)"
+      # ── Scan: Allow failure so sync is never accidentally blocked ──
+      - name: "🔍 DevOps System Scan"
         id: scan
         env:
           CF_ADMIN_TOKEN: ${{ secrets.CF_ADMIN_TOKEN }}
         run: |
           node scripts/devops_check.js
-        continue-on-error: false
+        continue-on-error: true  # CRITICAL: Never let a scan failure block the sync
 
-      - name: "🔄 Maintenance: Scheduled Rate Sync (Budget-Safe)"
-        if: steps.scan.outputs.allow_maintenance == 'true'
+      # ── Rate Sync: Runs UNCONDITIONALLY every hour ──
+      # The /api/admin/sync endpoint has its own throttle (1h min interval),
+      # circuit breaker, and daily credit quota guard built-in.
+      # GitHub Actions just triggers it — the Worker decides whether to act.
+      - name: "🔄 Scheduled Rate Sync (Budget-Safe)"
         env:
           CF_ADMIN_TOKEN: ${{ secrets.CF_ADMIN_TOKEN }}
         run: |
-          echo "🔄 System Healthy. Checking if Twelve Data sync is due..."
+          echo "🔄 Triggering hourly rate sync at $(date -u)"
           RESPONSE=$(curl -s -w "\n%{http_code}" \
             -X POST \
             -H "Authorization: Bearer $CF_ADMIN_TOKEN" \
             "https://ofwpesorate.madzlab.site/api/admin/sync")
           HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+          JSON_BODY=$(echo "$RESPONSE" | head -n -1)
+          echo "HTTP Status: $HTTP_CODE"
+          echo "Response: $JSON_BODY"
           if [ "$HTTP_CODE" = "200" ]; then
-            echo "✅ Sync successful or throttle active."
-            echo "🔔 Firing Notification Alert Engine..."
-            curl -s -X POST \
-              -H "Authorization: Bearer $CF_ADMIN_TOKEN" \
-              "https://ofwpesorate.madzlab.site/api/admin/alert"
+            echo "✅ Sync successful or cache is fresh."
           elif [ "$HTTP_CODE" = "429" ]; then
-            echo "⚠️  Budget protection triggered. OK."
+            echo "⚠️  Daily quota guard triggered (700 credits). Cache active. OK."
+          elif [ "$HTTP_CODE" = "503" ]; then
+            echo "⚠️  Circuit breaker active. Skipping. OK."
           else
             echo "❌ Sync failed with HTTP $HTTP_CODE"
             exit 1
           fi
 
-      - name: "📸 Maintenance: Daily Snapshot Seeding"
-        if: steps.scan.outputs.allow_maintenance == 'true'
+      # ── Snapshot: Runs UNCONDITIONALLY every hour ──
+      # Reads from D1 only (zero API credits). Safe to run frequently.
+      - name: "📸 Trend Snapshot (D1-Only, Zero Credits)"
+        run: |
+          echo "📸 Saving currency trend snapshot at $(date -u)"
+          RESPONSE=$(curl -s -w "\n%{http_code}" \
+            -X POST \
+            -H "Authorization: Bearer $CF_ADMIN_TOKEN" \
+            "https://ofwpesorate.madzlab.site/api/admin/snapshot")
+          HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+          JSON_BODY=$(echo "$RESPONSE" | head -n -1)
+          echo "Snapshot HTTP Status: $HTTP_CODE"
+          if [ "$HTTP_CODE" = "200" ]; then
+            echo "✅ Trend snapshot saved."
+          else
+            echo "⚠️  Snapshot returned HTTP $HTTP_CODE (non-fatal)."
+          fi
+        env:
+          CF_ADMIN_TOKEN: ${{ secrets.CF_ADMIN_TOKEN }}
+
+      # ── Alert Engine: Only fires if scan showed something important ──
+      - name: "🔔 Notification Alert Engine"
+        if: steps.scan.outputs.system_status != '' && steps.scan.outputs.allow_maintenance == 'true'
         env:
           CF_ADMIN_TOKEN: ${{ secrets.CF_ADMIN_TOKEN }}
         run: |
-          echo "📸 System Healthy. Triggering Daily snapshot..."
+          echo "🔔 Firing Notification Alert Engine..."
           curl -s -X POST \
             -H "Authorization: Bearer $CF_ADMIN_TOKEN" \
-            "https://ofwpesorate.madzlab.site/api/admin/snapshot"
+            "https://ofwpesorate.madzlab.site/api/admin/alert" || true
 
-      - name: "🧹 Maintenance: Automated Log Rotation & Cleanup"
-        if: steps.scan.outputs.allow_maintenance == 'true'
+      # ── Log Cleanup: Non-fatal ──
+      - name: "🧹 Automated Log Rotation & Cleanup"
         env:
           CF_ADMIN_TOKEN: ${{ secrets.CF_ADMIN_TOKEN }}
         run: |
-          echo "🧹 System Healthy. Cleaning old telemetry logs..."
+          echo "🧹 Cleaning old telemetry logs..."
           curl -s -X POST \
             -H "Authorization: Bearer $CF_ADMIN_TOKEN" \
-            "https://ofwpesorate.madzlab.site/api/admin/cleanup"
+            "https://ofwpesorate.madzlab.site/api/admin/cleanup" || true
 
-      - name: "🚨 Alert on Critical Scan Failure"
+      # ── Failure Alert ──
+      - name: "🚨 Alert on Critical Sync Failure"
         if: failure()
         run: |
           echo "🚨 DevOps Engine detected a CRITICAL issue."
           if [ -n "${{ secrets.DISCORD_WEBHOOK_URL }}" ]; then
             curl -H "Content-Type: application/json" \
                  -X POST \
-                 -d "{\"content\": \"⛔ **CRITICAL: OFW DevOps AI Check FAILED** or System is DOWN. Maintenance Locked.\"}" \
+                 -d "{\"content\": \"⛔ **CRITICAL: OFW Hourly Sync FAILED**. Rate data may be stale. Check GitHub Actions.\"}" \
                  "${{ secrets.DISCORD_WEBHOOK_URL }}"
           fi

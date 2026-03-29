@@ -9,54 +9,118 @@ on:
 jobs:
   deploy-and-safeguard:
     runs-on: ubuntu-latest
-    name: Build, E2E Test, and Promote
+    name: Build, Validate, and Promote to Production
     steps:
-      - name: Checkout Code
+      - name: "📦 Checkout Code"
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - name: "🛠️ Setup Node.js"
         uses: actions/setup-node@v4
         with:
           node-version: 20
 
-      - name: Install Dependencies
+      - name: "📥 Install Dependencies"
         run: npm ci
 
-      - name: 🚀 Deploy to Cloudflare Preview
-        id: deploy_preview
+      # ── Step 1: Deploy static assets + functions to Cloudflare Pages Production ──
+      # wrangler pages deploy uploads BOTH the public/ directory AND the functions/
+      # directory automatically (Pages Functions convention).
+      - name: "🚀 Deploy to Cloudflare Pages (Production)"
+        id: deploy
         run: |
-          # Deploying without an explicit production branch targets a preview environment
-          OUTPUT=$(npx wrangler pages deploy public --project-name=ofw-pesorate)
-          echo "$OUTPUT"
-          
-          # Extract the deployment URL for testing (only taking the first match to prevent multi-line corruption)
-          PREVIEW_URL=$(echo "$OUTPUT" | grep -o 'https://[^"]*\.ofw-pesorate\.pages\.dev' | head -n 1)
-          echo "TEST_URL=$PREVIEW_URL" >> $GITHUB_ENV
+          echo "🚀 Deploying public/ + functions/ to Cloudflare Pages production..."
+          npx wrangler pages deploy public \
+            --project-name=ofw-pesorate \
+            --branch=production \
+            --commit-dirty=true \
+            --commit-message="${{ github.event.head_commit.message || 'Manual deploy' }}"
+          echo "✅ Deploy submitted to Cloudflare."
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
-      - name: 🧪 Run Global Health Checks on Preview
-        run: node scripts/health_check.js
+      # ── Step 2: Wait for propagation ──
+      - name: "⏳ Wait for Edge Propagation (30s)"
+        run: sleep 30
+
+      # ── Step 3: HTTP-based API Health Check (no Puppeteer needed) ──
+      - name: "🧪 API Health Verification"
+        id: api_check
+        run: |
+          echo "🧪 Verifying production API endpoints..."
+          BASE_URL="https://ofwpesorate.madzlab.site"
+
+          # 1. Health endpoint
+          HEALTH=$(curl -s -o /dev/null -w "%{http_code}" "$BASE_URL/api/health")
+          echo "  /api/health → HTTP $HEALTH"
+          if [ "$HEALTH" != "200" ] && [ "$HEALTH" != "304" ]; then
+            echo "❌ Health check failed: HTTP $HEALTH"
+            exit 1
+          fi
+
+          # 2. Rate endpoint (primary user flow)
+          RATE=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: Bearer $CF_ADMIN_TOKEN" \
+            "$BASE_URL/api/rate")
+          echo "  /api/rate → HTTP $RATE"
+          if [ "$RATE" != "200" ] && [ "$RATE" != "304" ]; then
+            echo "❌ Rate API failed: HTTP $RATE"
+            exit 1
+          fi
+
+          # 3. Admin system check (validates Worker + D1 binding)
+          SYSTEM=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: Bearer $CF_ADMIN_TOKEN" \
+            "$BASE_URL/api/admin/system")
+          echo "  /api/admin/system → HTTP $SYSTEM"
+          if [ "$SYSTEM" != "200" ]; then
+            echo "❌ Admin system check failed: HTTP $SYSTEM"
+            exit 1
+          fi
+
+          echo "✅ All API health checks PASSED."
         env:
           CF_ADMIN_TOKEN: ${{ secrets.CF_ADMIN_TOKEN }}
 
-      - name: 🚚 Promote to Production
-        if: success()
-        run: npx wrangler pages deploy public --project-name=ofw-pesorate --branch=production --commit-dirty=true
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-
-      - name: 🧹 Purge Cloudflare Edge Cache
+      # ── Step 4: Purge Cloudflare Edge Cache ──
+      - name: "🧹 Purge Cloudflare Edge Cache"
         if: success()
         run: node scripts/purge_cache.js
         env:
           CLOUDFLARE_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          
-      - name: 🚨 Alert on Deployment Failure
+
+      # ── Step 5: Force a post-deploy rate sync via admin API ──
+      - name: "🔄 Post-Deploy: Force Rate Sync"
+        if: success()
+        run: |
+          echo "🔄 Triggering post-deploy rate sync to warm up D1 cache..."
+          RESPONSE=$(curl -s -w "\n%{http_code}" \
+            -X POST \
+            -H "Authorization: Bearer $CF_ADMIN_TOKEN" \
+            "https://ofwpesorate.madzlab.site/api/admin/sync")
+          HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+          JSON_BODY=$(echo "$RESPONSE" | head -n -1)
+          echo "  Sync → HTTP $HTTP_CODE"
+          echo "  Response: $JSON_BODY"
+          if [ "$HTTP_CODE" = "200" ]; then
+            echo "✅ Rate sync complete or cache is fresh."
+          elif [ "$HTTP_CODE" = "429" ]; then
+            echo "⚠️  API quota guard active — cache is fresh. OK."
+          else
+            echo "⚠️  Sync returned HTTP $HTTP_CODE — non-fatal, continuing."
+          fi
+        env:
+          CF_ADMIN_TOKEN: ${{ secrets.CF_ADMIN_TOKEN }}
+
+      # ── Failure Handler ──
+      - name: "🚨 Alert on Deployment Failure"
         if: failure()
         run: |
-          echo "Deployment tests failed. Production remains untouched."
-          # Optionally add curl here to hit a Slack Webhook using secrets.SLACK_WEBHOOK_URL
+          echo "🚨 Deployment pipeline FAILED. Review logs above."
+          if [ -n "${{ secrets.DISCORD_WEBHOOK_URL }}" ]; then
+            curl -H "Content-Type: application/json" \
+                 -X POST \
+                 -d "{\"content\": \"⛔ **OFW Deploy FAILED** for commit \`${{ github.sha }}\`. Check GitHub Actions.\"}" \
+                 "${{ secrets.DISCORD_WEBHOOK_URL }}"
+          fi

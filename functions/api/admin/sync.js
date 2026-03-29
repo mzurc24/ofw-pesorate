@@ -137,21 +137,6 @@ export async function onRequest(context) {
     // GitHub Actions CRON enforces the schedule — this is a second-layer guard.
     const SYNC_INTERVAL_MS = 1 * 60 * 60 * 1000; // 1 hour
 
-const TWELVE_SYMBOLS = [
-  'EUR/USD', 'EUR/PHP', 'EUR/SGD', 'EUR/JPY', 'EUR/GBP',
-  'EUR/SAR', 'EUR/AED', 'EUR/QAR', 'EUR/KWD', 'EUR/OMR',
-  'EUR/BHD', 'EUR/CAD', 'EUR/AUD', 'EUR/NZD', 'EUR/CHF',
-  'EUR/NOK', 'EUR/SEK', 'EUR/HKD', 'EUR/MYR', 'EUR/TWD',
-  'EUR/KRW', 'EUR/CNY', 'EUR/THB', 'EUR/MXN'
-].join(',');
-
-const EMERGENCY_RATES = {
-  USD: 1.08, PHP: 63.5, SGD: 1.45, JPY: 162.0, GBP: 0.855,
-  SAR: 4.05, AED: 3.97, QAR: 3.93, KWD: 0.332, OMR: 0.416,
-  BHD: 0.407, EUR: 1.00, CAD: 1.50, AUD: 1.69, NZD: 1.85,
-  CHF: 0.96, NOK: 11.55, SEK: 11.20, HKD: 8.42, MYR: 4.82,
-  TWD: 34.90, KRW: 1460, CNY: 7.85, THB: 37.50, MXN: 21.8
-};
     if (now - lastSync < SYNC_INTERVAL_MS) {
       return new Response(JSON.stringify({
         status: 'success', // legacy compat
@@ -240,37 +225,3 @@ const EMERGENCY_RATES = {
   }
 }
 
-/**
- * Fetch all rates from Twelve Data batch price endpoint.
- * Response format: { "EUR/USD": { "price": "1.0921" }, "EUR/PHP": { "price": "63.45" }, ... }
- * Transformed to: { EUR: 1.0, USD: 1.0921, PHP: 63.45, ... } 
- */
-async function fetchFromTwelveData(apiKey) {
-  const url = `https://api.twelvedata.com/price?symbol=${TWELVE_SYMBOLS}&apikey=${apiKey}`;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`Twelve Data HTTP ${res.status}`);
-
-  const data = await res.json();
-  if (data.code === 400 || data.status === 'error') {
-    throw new Error(`Twelve Data API error: ${data.message || 'Unknown error'}`);
-  }
-
-  const rates = { EUR: 1.0 };
-  let successCount = 0;
-  for (const [pair, val] of Object.entries(data)) {
-    const currency = pair.split('/')[1];
-    if (!currency) continue;
-    if (val.code === 400 || val.status === 'error' || !val.price) {
-      if (EMERGENCY_RATES[currency]) rates[currency] = EMERGENCY_RATES[currency];
-      continue;
-    }
-    const price = parseFloat(val.price);
-    if (!isNaN(price) && price > 0) {
-      rates[currency] = price;
-      successCount++;
-    }
-  }
-
-  if (successCount < 10) throw new Error(`Twelve Data: only ${successCount} valid rates returned.`);
-  return rates;
-}
