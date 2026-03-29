@@ -62,7 +62,7 @@
 
     
     // UI Elements
-    const phSelectorContainer   = document.getElementById('ph-selector-container');
+    const phSelectorContainer   = document.getElementById('currency-selector-container');
 
 
     // ── Local State ──────────────────────────────────────────────────────────
