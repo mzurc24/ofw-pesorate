@@ -8,7 +8,7 @@ export async function onRequest(context) {
     const url = new URL(request.url);
     
     // 1. Authentication (Basic Auth & Bearer Token fallback)
-    const validToken = (env.CF_ADMIN_TOKEN || 'ofwAk026').trim();
+    const validToken = (env.CF_ADMIN_TOKEN || '').trim();
     const expectedUser = 'admin';
     const expectedPass = validToken;
     
@@ -869,5 +869,6 @@ export async function onRequest(context) {
         }
     });
 }
-/ /   D e p l o y m e n t   P u s h :   2 0 2 6 - 0 3 - 2 9 - 1 5 2 1  
+/ /   D e p l o y m e n t   P u s h :   2 0 2 6 - 0 3 - 2 9 - 1 5 2 1 
+ 
  

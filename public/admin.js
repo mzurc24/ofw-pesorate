@@ -2,6 +2,17 @@
     'use strict';
 
     // ══════════════════════════════════════════════════════════════════════
+    // SECURITY: Strip secret token from URL to prevent history leaks
+    // ══════════════════════════════════════════════════════════════════════
+    if (window.history && window.history.replaceState) {
+        const urlObj = new URL(window.location.href);
+        if (urlObj.searchParams.has('t')) {
+            urlObj.searchParams.delete('t');
+            window.history.replaceState({ path: urlObj.href }, '', urlObj.href);
+        }
+    }
+
+    // ══════════════════════════════════════════════════════════════════════
     // DOM REFERENCES
     // ══════════════════════════════════════════════════════════════════════
     const $ = id => document.getElementById(id);

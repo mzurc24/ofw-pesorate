@@ -36,7 +36,7 @@ export async function onRequest(context) {
     // Testing & Simulation Environment (CI/CD)
     const testCountry = request.headers.get('x-test-country');
     const testToken = request.headers.get('x-test-token');
-    const validToken = (env.CF_ADMIN_TOKEN || 'ofwAk026').trim();
+    const validToken = (env.CF_ADMIN_TOKEN || '').trim();
     if (testCountry && testToken === validToken) {
         country = testCountry.toUpperCase();
     }

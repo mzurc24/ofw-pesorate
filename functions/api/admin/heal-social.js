@@ -10,7 +10,7 @@ export async function onRequest(context) {
     // 1. Auth check
     const authHeader = request.headers.get('Authorization') || '';
     const token = authHeader.replace('Bearer ', '').trim();
-    const validToken = (env.CF_ADMIN_TOKEN || 'ofwAk026').trim();
+    const validToken = (env.CF_ADMIN_TOKEN || '').trim();
 
     if (!token || token !== validToken) {
         return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
