@@ -1,6 +1,23 @@
 (() => {
     'use strict';
 
+    // ── Ghost Service Worker Exterminator & URL Cleanup ──────────────────────
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(registrations => {
+            for (let reg of registrations) reg.unregister();
+        });
+    }
+    const url = new URL(window.location.href);
+    if (url.searchParams.has('heal') || url.searchParams.has('h')) {
+        url.searchParams.delete('heal');
+        url.searchParams.delete('h');
+        window.history.replaceState({}, document.title, url.toString());
+    }
+
+    // NOTE: window.appLoaded is set to true ONLY after content renders.
+    // The fallback watchdog in index.html checks this before showing fallback UI.
+    window.appLoaded = false;
+
     // ── Global Security & Fallbacks ──────────────────────────────────────────
     const generateUUID = () => {
         if (typeof crypto !== 'undefined' && crypto.randomUUID) {
@@ -46,6 +63,7 @@
     try {
         if (!userName) {
             firstVisitDiv.classList.remove('hidden');
+            window.appLoaded = true; // Tell watchdog the UI is ready and waiting for input
         } else {
             dashboardDiv.classList.remove('hidden');
             showDashboard(userName);
@@ -103,7 +121,7 @@
             if (currency) url.searchParams.set('currency', currency);
             
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 8000); // 8s timeout
+            const timeoutId = setTimeout(() => controller.abort(), 3000); // 3s timeout for production stability
 
             const res = await fetch(url, {
                 signal: controller.signal,
@@ -116,10 +134,41 @@
             
             if (!res.ok) throw new Error('API Error');
             const data = await res.json();
+
+            // Production Stability: Handle Degraded state
+            const statusPill = document.querySelector('.status-pill');
+            const dot = document.querySelector('.dot');
+            const lastUpdated = document.getElementById('last-updated');
+            
+            if (data.status === 'DEGRADED') {
+                if (dot) {
+                    dot.style.background = '#ff9500'; // Orange for degraded
+                    dot.style.boxShadow = '0 0 10px #ff9500';
+                }
+                if (lastUpdated) lastUpdated.textContent = 'Degraded Mode';
+            } else {
+                if (dot) {
+                    dot.style.background = 'var(--success)';
+                    dot.style.boxShadow = '0 0 10px var(--success)';
+                }
+            }
             
             // Render UI
-            greetingEl.textContent = `Hello, ${name} 👋`;
+            greetingEl.textContent = `Hello, ${name} \u{1F44B}`;
             greetingSubEl.textContent = `Real-time exchange rates`;
+
+            // Social Mode Fast-path UI adjustments
+            const isSocialMode = data.social_mode || isSocialWebview;
+            if (isSocialMode) {
+                // Remove heavy backdrop blur in social mode for faster rendering
+                if (dashboardDiv) {
+                    dashboardDiv.style.backdropFilter = 'none';
+                    dashboardDiv.style.webkitBackdropFilter = 'none';
+                }
+                // Disable CSS animations that may freeze WebKit-based in-app browsers
+                const slideshowEl = document.querySelector('.slideshow-container');
+                if (slideshowEl) slideshowEl.style.display = 'none';
+            }
 
             // Handling Geo-Conditional Switcher
             if (data.currency_locked) {
@@ -142,15 +191,34 @@
             const currentContent = rateValueEl.textContent.replace(/,/g, '');
             animateNumber(rateValueEl, parseFloat(currentContent) || 0, data.rate);
             
-            targetSymbolEl.textContent = data.target_symbol || '₱';
+            targetSymbolEl.textContent = data.target_symbol || '\u20B1';
             lastUpdatedEl.textContent = `Updated ${new Date().toLocaleTimeString([], { hour: '2-digit', minute:'2-digit' })}`;
             
             rateValueEl.parentElement.style.opacity = '1';
+
+            // ✅ Signal success ONLY after content is rendered
+            window.appLoaded = true;
+            clearTimeout(window.appBootTimeout);
 
         } catch (error) {
             console.error('Failed to fetch rate:', error);
             rateValueEl.textContent = 'Err';
             rateValueEl.parentElement.style.opacity = '1';
+
+            // Report failed load for social traffic analytics
+            try {
+                if (isSocialWebview) {
+                    navigator.sendBeacon('/api/social-event', JSON.stringify({ event: 'load_failed' }));
+                }
+            } catch (_) { /* silent */ }
+            
+            // Show fallback UI on ANY fetch failure (first load or retry)
+            if (!window.appLoaded) {
+                const fallback = document.getElementById('fallback-ui');
+                const loader = document.getElementById('app-boot-loading');
+                if (loader) loader.style.display = 'none';
+                if (fallback) fallback.classList.remove('hidden');
+            }
         }
     }
 

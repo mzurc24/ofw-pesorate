@@ -978,7 +978,7 @@
     });
 
     if (syncBtn) syncBtn.addEventListener('click', async () => {
-        if (!confirm('Force a fresh rate sync from Fixer API?')) return;
+        if (!confirm('Force a fresh rate sync from Twelve Data API?')) return;
         syncBtn.disabled = true;
         syncBtn.textContent = '🔄 Syncing…';
 

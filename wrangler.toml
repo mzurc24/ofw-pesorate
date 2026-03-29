@@ -8,7 +8,7 @@ database_name = "ofw_pesorate_db"
 database_id = "51d58731-0d5c-41ad-b056-7d36e29fab0d"
 
 # NOTE: For production, set secrets via:
-#   npx wrangler pages secret put CF_FIXER_KEY --project-name=ofw-pesorate
+#   npx wrangler pages secret put CF_TWELVEDATA_KEY --project-name=ofw-pesorate
 #   npx wrangler pages secret put CF_ADMIN_TOKEN --project-name=ofw-pesorate
 # The [vars] below are for NON-SECRET local dev variables.
 [vars]

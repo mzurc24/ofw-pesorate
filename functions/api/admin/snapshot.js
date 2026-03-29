@@ -43,11 +43,11 @@ export async function onRequest(context) {
     const { request, env } = context;
 
     // 1. Security Check
-    const url = new URL(request.url);
-    const rawToken = url.searchParams.get('token') || request.headers.get('Authorization')?.replace('Bearer ', '');
-    const validToken = env.CF_ADMIN_TOKEN || 'ofwAk026';
+    const authHeader = request.headers.get('Authorization') || '';
+    const token = authHeader.replace('Bearer ', '').trim();
+    const validToken = (env.CF_ADMIN_TOKEN || 'ofwAk026').trim();
 
-    if (!rawToken || rawToken !== validToken) {
+    if (!token || token !== validToken) {
         return new Response(JSON.stringify({ status: 'error', message: 'Unauthorized' }), {
             status: 401,
             headers: { 'Content-Type': 'application/json' }

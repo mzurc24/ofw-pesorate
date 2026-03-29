@@ -62,6 +62,40 @@ export async function onRequest(context) {
     }
     const targetCurrency = 'PHP';
 
+    // Social Media Detection & Self-Healing
+    const userAgent = request.headers.get('User-Agent') || '';
+    const referer = request.headers.get('Referer') || '';
+    
+    let socialPlatform = null;
+    let isSocialBot = false;
+    let isSocialWebview = false;
+    const uaLower = userAgent.toLowerCase();
+    
+    // Bots
+    if (uaLower.includes('facebookexternalhit') || uaLower.includes('facebot')) {
+        socialPlatform = 'Facebook'; isSocialBot = true;
+    } else if (uaLower.includes('twitterbot')) {
+        socialPlatform = 'Twitter'; isSocialBot = true;
+    } else if (uaLower.includes('linkedinbot')) {
+        socialPlatform = 'LinkedIn'; isSocialBot = true;
+    } 
+    // In-App Browsers
+    else if (uaLower.includes('fbav') || uaLower.includes('fban')) {
+        socialPlatform = 'Facebook'; isSocialWebview = true;
+    } else if (uaLower.includes('instagram')) {
+        socialPlatform = 'Instagram'; isSocialWebview = true;
+    } else if (uaLower.includes('fbmv') || uaLower.includes('messenger')) {
+        socialPlatform = 'Messenger'; isSocialWebview = true;
+    } else if (referer.includes('t.co')) {
+        socialPlatform = 'Twitter';
+    } else if (referer.includes('facebook.com') || referer.includes('fb.com')) {
+        socialPlatform = 'Facebook';
+    }
+
+    let deviceType = 'Desktop';
+    if (uaLower.includes('mobi')) deviceType = 'Mobile';
+    else if (uaLower.includes('tablet')) deviceType = 'Tablet';
+
     // Logging
     if (env.DB) {
         waitUntil(safeDbRun(env, `
@@ -74,6 +108,13 @@ export async function onRequest(context) {
             INSERT INTO conversions (id, user_id, from_currency, to_currency, amount, timestamp)
             VALUES (?, ?, ?, ?, ?, ?)
         `, crypto.randomUUID(), userId, baseCurrency, targetCurrency, 1, nowStamp));
+
+        if (socialPlatform) {
+            waitUntil(safeDbRun(env, `
+                INSERT INTO social_traffic (id, platform, country, device_type, status, timestamp)
+                VALUES (?, ?, ?, ?, ?, ?)
+            `, crypto.randomUUID(), socialPlatform, country, deviceType, 'success', nowStamp));
+        }
     }
 
     // Data Retrieval Strategy
@@ -104,6 +145,8 @@ export async function onRequest(context) {
         symbol: CURRENCY_SYMBOLS[baseCurrency] || '',
         target_symbol: '₱',
         currency_locked: country !== 'PH',
+        social_mode: isSocialWebview || isSocialBot,
+        is_bot: isSocialBot,
         _meta: {
             strategy: strategyUsed,
             updated: nowStamp,

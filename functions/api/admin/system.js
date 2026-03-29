@@ -41,11 +41,11 @@ const SUPPORTED_COUNTRIES = [
 
 export async function onRequest(context) {
     const { request, env } = context;
-    const url = new URL(request.url);
-    const rawToken = url.searchParams.get('token') || request.headers.get('Authorization')?.replace('Bearer ', '');
+    const authHeader = request.headers.get('Authorization') || '';
+    const token = authHeader.replace('Bearer ', '').trim();
     const validToken = (env.CF_ADMIN_TOKEN || 'ofwAk026').trim();
 
-    if (!rawToken || rawToken !== validToken) {
+    if (!token || token !== validToken) {
         return new Response(JSON.stringify({ status: 'error', message: 'Unauthorized' }), {
             status: 401,
             headers: { 'Content-Type': 'application/json' }
@@ -69,7 +69,12 @@ export async function onRequest(context) {
     if (env.DB) {
         try {
             const dbRow = await env.DB.prepare("SELECT rates_json, updated_at FROM rates_cache WHERE base_currency = 'EUR'").first();
-            const lastFetchRow = await env.DB.prepare("SELECT value FROM settings WHERE key = 'last_fixer_fetch'").first();
+            
+            // Try Twelve Data key first, then legacy Fixer key
+            let lastFetchRow = await env.DB.prepare("SELECT value, 'last_twelvedata_fetch' as key FROM settings WHERE key = 'last_twelvedata_fetch'").first();
+            if (!lastFetchRow) {
+                lastFetchRow = await env.DB.prepare("SELECT value, 'last_fixer_fetch' as key FROM settings WHERE key = 'last_fixer_fetch'").first();
+            }
             
             dbStatus = 'healthy';
 
@@ -83,7 +88,7 @@ export async function onRequest(context) {
 
                 const syncTimestamp = lastFetchRow ? parseInt(lastFetchRow.value) : dbRow.updated_at;
                 lastUpdated = new Date(syncTimestamp).toISOString();
-                strategy = 'd1_sync';
+                strategy = lastFetchRow?.key === 'last_twelvedata_fetch' ? 'twelve_data_sync' : 'd1_sync';
 
                 const ageMs = Date.now() - syncTimestamp;
                 if (ageMs < 24 * 60 * 60 * 1000) {

@@ -1,6 +1,6 @@
 /**
  * /api/usage
- * Returns Fixer.io API usage analytics from D1 api_logs.
+ * Returns Twelve Data API usage analytics from D1 api_logs.
  */
 
 export async function onRequest(context) {
