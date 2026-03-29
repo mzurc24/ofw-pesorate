@@ -140,7 +140,8 @@ export async function onRequest(context) {
     const SYNC_INTERVAL_MS = 2 * 60 * 60 * 1000; // 2 hours
     if (now - lastSync < SYNC_INTERVAL_MS) {
       return new Response(JSON.stringify({
-        status: 'HEALTHY',
+        status: 'success', // legacy compat
+        result: 'HEALTHY',
         data_source: 'CACHE',
         message: 'Data is fresh (within 2h window). Sync skipped to protect API quota.',
         last_sync_mins_ago: Math.floor((now - lastSync) / 60000),
@@ -204,10 +205,12 @@ export async function onRequest(context) {
     ]);
 
     return new Response(JSON.stringify({
-      status: 'HEALTHY',
+      status: 'success',
+      result: 'HEALTHY',
       data_source: 'TWELVE_DATA',
       message: 'Rates synced successfully from Twelve Data.',
       currencies_synced: Object.keys(fetchedRates).length,
+      count: Object.keys(fetchedRates).length, // Map to legacy 'count'
       credits_used_this_call: CREDITS_PER_CALL,
       credits_used_today: dailyCalls + CREDITS_PER_CALL,
       credits_remaining_today: 700 - (dailyCalls + CREDITS_PER_CALL),
