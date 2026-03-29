@@ -7,7 +7,7 @@
  *
  * Budget:      800 credits/day (Twelve Data free tier)
  * Per sync:    24 currency pairs = 24 credits per call
- * Schedule:    every 2h = 12 syncs/day = 288 credits/day (36% of limit)
+ * Schedule:    every 1h = 24 syncs/day = 576 credits/day (72% of limit)
  * Daily guard: hard cap at 700 credits/day (leaves 100 buffer)
  */
 
@@ -134,10 +134,10 @@ export async function onRequest(context) {
       }), { status: 503, headers: { 'Content-Type': 'application/json' } });
     }
 
-    // C. Throttle Check — 2 hour minimum interval between syncs
+    // C. Throttle Check — 1 hour minimum interval between syncs
     // This is the PRIMARY protection against over-fetching.
     // GitHub Actions CRON enforces the schedule — this is a second-layer guard.
-    const SYNC_INTERVAL_MS = 2 * 60 * 60 * 1000; // 2 hours
+    const SYNC_INTERVAL_MS = 1 * 60 * 60 * 1000; // 1 hour
 
 const TWELVE_SYMBOLS = [
   'EUR/USD', 'EUR/PHP', 'EUR/SGD', 'EUR/JPY', 'EUR/GBP',
