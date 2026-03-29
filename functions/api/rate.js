@@ -86,7 +86,7 @@ export async function onRequest(context) {
 
     if (isPH) {
         // PH Users: Show USD <-> PHP Conversion.
-        baseCurrency = 'PHP'; // Default PHP
+        baseCurrency = 'USD'; // Default USD
         secondaryCurrency = 'USD';
         currencyLocked = false; // Enable manual switch
 
