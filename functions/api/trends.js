@@ -12,16 +12,26 @@ export async function onRequest(context) {
             });
         }
 
-        // Parse and restructure the trend payload for optimal frontend charting
         const trends = query.results.reverse().map(row => {
             const parsed = JSON.parse(row.snapshot_json);
             const rateMap = {};
             
-            // Convert array of {pair: "SGD_PHP", rate: 50.1} to { SGD: 50.1, USD: ... }
-            parsed.forEach(item => {
-                const baseCurrency = item.pair.split('_')[0];
+            // Robust parsing: Handle both array and object snapshot formats
+            let items = [];
+            if (Array.isArray(parsed)) {
+                items = parsed;
+            } else if (typeof parsed === 'object' && parsed !== null) {
+                // If it's the new USD-base object { PHP: 56.4, ... }
+                items = Object.entries(parsed).map(([curr, rate]) => ({ pair: `${curr}_PHP`, rate: rate }));
+            }
+
+            items.forEach(item => {
+                const parts = item.pair.split('_');
+                const baseCurrency = parts[0];
                 rateMap[baseCurrency] = item.rate;
             });
+
+
             
             return {
                 date: row.date,

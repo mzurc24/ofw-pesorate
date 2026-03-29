@@ -1,12 +1,13 @@
+import { checkAdminAuth } from './_auth.js';
+
 export async function onRequest(context) {
+
     const { request, env } = context;
 
-    // Secure via existing admin token logic
-    const validToken = (env.CF_ADMIN_TOKEN || '').trim();
-    const authHeader = request.headers.get('Authorization') || '';
-    if (authHeader.replace('Bearer ', '').trim() !== validToken) {
-        return new Response(JSON.stringify({ status: 'error', message: 'Unauthorized' }), { status: 401 });
-    }
+    // 1. Security Check
+    const auth = checkAdminAuth(request, env);
+    if (!auth.authorized) return auth.response;
+
 
     if (!env.DISCORD_WEBHOOK_URL) {
         return new Response(JSON.stringify({ status: 'ignored', message: 'No Discord Webhook configured.' }), { status: 200 });
@@ -21,19 +22,22 @@ export async function onRequest(context) {
             return new Response(JSON.stringify({ status: 'ignored', message: 'Daily alert already sent.' }), { status: 200 });
         }
 
-        // Gather real-time rates
-        const ratesRow = await env.DB.prepare("SELECT rates_json FROM rates_cache WHERE base_currency = 'EUR'").first();
+        // Gather real-time rates (Migrated to USD base)
+        const ratesRow = await env.DB.prepare("SELECT rates_json FROM rates_cache WHERE base_currency = 'USD'").first();
+
         if (!ratesRow) return new Response('No rates available.', { status: 500 });
         
         const allRates = JSON.parse(ratesRow.rates_json);
         const phpRate = allRates['PHP'];
         const sgdRate = allRates['SGD'];
-        const usdRate = allRates['USD'];
+        const usdRate = allRates['USD'] || 1.0;
         const aedRate = allRates['AED'];
         
+        // Universal math using USD-indexed base
         const sgdToPhp = (phpRate / sgdRate).toFixed(2);
         const usdToPhp = (phpRate / usdRate).toFixed(2);
         const aedToPhp = (phpRate / aedRate).toFixed(2);
+
 
         // Broadcast Payload
         const payload = {

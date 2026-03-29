@@ -8,22 +8,17 @@
  */
 
 import { calculateRate, EMERGENCY_RATES } from '../rates.js';
+import { checkAdminAuth } from './_auth.js';
+
 
 export async function onRequest(context) {
     const { request, env } = context;
     const url = new URL(request.url);
 
     // 1. Security Check
-    const authHeader = request.headers.get('Authorization') || '';
-    const token = authHeader.replace('Bearer ', '').trim();
-    const validToken = (env.CF_ADMIN_TOKEN || '').trim();
+    const auth = checkAdminAuth(request, env);
+    if (!auth.authorized) return auth.response;
 
-    if (!token || token !== validToken) {
-        return new Response(JSON.stringify({ status: 'error', message: 'Unauthorized' }), {
-            status: 401,
-            headers: { 'Content-Type': 'application/json' }
-        });
-    }
 
     const results = {
         status: 'ok',
@@ -34,8 +29,9 @@ export async function onRequest(context) {
     };
 
     try {
-        // 2. Fetch D1 Cache
-        const cacheRecord = await env.DB.prepare("SELECT rates_json, updated_at FROM rates_cache WHERE base_currency = 'EUR'").first();
+        // 2. Fetch D1 Cache (Now USD-based)
+        const cacheRecord = await env.DB.prepare("SELECT rates_json, updated_at FROM rates_cache WHERE base_currency = 'USD'").first();
+
         if (!cacheRecord) {
             results.status = 'degraded';
             results.consistent = false;
@@ -55,10 +51,11 @@ export async function onRequest(context) {
             const rate = calculateRate(cachedRates, pair.from, pair.to);
             const converted = parseFloat((pair.amount * rate).toFixed(4));
             
-            // Mathematical Expectation: (eurToTarget / eurToSource) * amount
-            const eurToSource = cachedRates[pair.from] || EMERGENCY_RATES[pair.from];
-            const eurToTarget = cachedRates[pair.to] || EMERGENCY_RATES[pair.to];
-            const expected = parseFloat(((eurToTarget / eurToSource) * pair.amount).toFixed(4));
+            // Mathematical Expectation: (usdToTarget / usdToSource) * amount
+            const usdToSource = cachedRates[pair.from] || EMERGENCY_RATES[pair.from];
+            const usdToTarget = cachedRates[pair.to] || EMERGENCY_RATES[pair.to];
+            const expected = parseFloat(((usdToTarget / usdToSource) * pair.amount).toFixed(4));
+
 
             const diff = Math.abs(converted - expected);
             const passed = diff <= 0.0001;
@@ -90,9 +87,10 @@ export async function onRequest(context) {
             const syncUrl = new URL('/api/admin/sync', url.origin);
             const syncRes = await fetch(syncUrl.toString(), {
                 method: 'POST',
-                headers: { 'Authorization': `Bearer ${validToken}` }
+                headers: { 'Authorization': `Bearer ${token}` }
                 // NOTE: No force=true — the 6h throttle in sync.js will skip Fixer if recently synced
             });
+
             const syncData = await syncRes.json();
 
             results.self_healed = syncRes.ok;

@@ -30,10 +30,45 @@ export async function onRequest(context) {
     const userId = (request.headers.get('x-user-id') || 'guest').substring(0, 50).replace(/[<>"'&]/g, "");
     const customCurrency = url.searchParams.get('currency');
     
-    // 1. Auto-Detect Country via Cloudflare GeoIP
-    let country = (request.cf?.country || 'US').toUpperCase();
+    // =====================================
+    // 🌍 AUTO COUNTRY DETECTION
+    // =====================================
+    let detectedCountry = null;
+
+    // A. Account Settings
+    const userPrefs = await safeDbQuery(env, "SELECT preferred_currency, home_currency FROM user_preferences WHERE user_id = ?", userId);
+    const userRecord = await safeDbQuery(env, "SELECT country FROM users WHERE id = ?", userId);
+    if (userRecord?.country) detectedCountry = userRecord.country;
+
+    // B. Local Storage Hint
+    if (!detectedCountry) {
+        const clientCountry = request.headers.get('x-client-country');
+        if (clientCountry) detectedCountry = clientCountry.toUpperCase();
+    }
+
+    // C. Browser Locale Hint
+    if (!detectedCountry) {
+        const locale = request.headers.get('x-browser-locale') || '';
+        const parts = locale.split('-');
+        if (parts.length > 1) detectedCountry = parts[1].toUpperCase();
+    }
+
+    // D. IP Address (Primary Default)
+    if (!detectedCountry) {
+        if (request.cf && request.cf.country) detectedCountry = request.cf.country.toUpperCase();
+    }
     
-    // Testing & Simulation Environment (CI/CD)
+    // Fallback if completely undetected
+    if (!detectedCountry) {
+        detectedCountry = 'US';
+        if (env.DB) {
+            waitUntil(safeDbRun(env, `INSERT INTO api_logs (endpoint, status) VALUES (?, ?)`, '/api/rate', 'error_country_detection_failed'));
+        }
+    }
+
+    let country = detectedCountry;
+
+    // Testing & Simulation Environment (CI/CD) Override
     const testCountry = request.headers.get('x-test-country');
     const testToken = request.headers.get('x-test-token');
     const validToken = (env.CF_ADMIN_TOKEN || '').trim();
@@ -41,12 +76,32 @@ export async function onRequest(context) {
         country = testCountry.toUpperCase();
     }
 
-    // 2. Resolve Base Currency
-    let baseCurrency = COUNTRY_CURRENCY_MAP[country] || 'USD';
-    if (customCurrency && CURRENCY_SYMBOLS[customCurrency]) {
-        baseCurrency = customCurrency;
+    // =====================================
+    // 💱 CURRENCY DISPLAY LOGIC (GEO-FENCED)
+    // =====================================
+    let isPH = (country === 'PH');
+    let baseCurrency;
+    let secondaryCurrency = null;
+    let currencyLocked = true;
+
+    if (isPH) {
+        // PH Users: Show USD <-> PHP Conversion.
+        baseCurrency = 'PHP'; // Default PHP
+        secondaryCurrency = 'USD';
+        currencyLocked = false; // Enable manual switch
+
+        // Apply saved preference or live custom switch ONLY for PH users
+        if (userPrefs?.preferred_currency) baseCurrency = userPrefs.preferred_currency;
+        if (customCurrency && CURRENCY_SYMBOLS[customCurrency]) baseCurrency = customCurrency;
+        
+    } else {
+        // Non-PH Users: Primary is Local currency. DO NOT show PHP <-> USD conversion. DISABLE switch.
+        baseCurrency = COUNTRY_CURRENCY_MAP[country] || 'USD';
+        currencyLocked = true;
     }
+
     const targetCurrency = 'PHP';
+
 
     // 3. Social Media Detection & Metadata
     const userAgent = request.headers.get('User-Agent') || '';
@@ -109,7 +164,9 @@ export async function onRequest(context) {
     let rates = null;
     let strategyUsed = 'fallback';
 
-    const cacheRecord = await safeDbQuery(env, `SELECT rates_json FROM rates_cache WHERE base_currency = 'EUR'`);
+    const cacheRecord = await safeDbQuery(env, `SELECT rates_json FROM rates_cache WHERE base_currency = 'USD'`);
+
+
     if (cacheRecord?.rates_json) {
         try { 
             rates = JSON.parse(cacheRecord.rates_json); 
@@ -124,17 +181,23 @@ export async function onRequest(context) {
 
     // 6. Final Calculation (Single Source of Math)
     const finalRate = calculateRate(rates, baseCurrency, targetCurrency);
+    const usdRate = calculateRate(rates, 'USD', 'PHP');
 
     return new Response(JSON.stringify({
         from_currency: baseCurrency,
         to_currency: targetCurrency,
         rate: finalRate,
+        usd_rate: usdRate,
         country: country,
         symbol: CURRENCY_SYMBOLS[baseCurrency] || '',
         target_symbol: '₱',
-        currency_locked: country !== 'PH', // If in PH, user can change anything
+        is_ph: isPH,
+        secondary_currency: secondaryCurrency,
+        secondary_symbol: CURRENCY_SYMBOLS[secondaryCurrency] || '$',
+        currency_locked: currencyLocked,
         social_mode: isSocialWebview || isSocialBot,
         is_bot: isSocialBot,
+
         _meta: {
             strategy: strategyUsed,
             provider: 'twelve_data',

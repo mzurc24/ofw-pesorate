@@ -5,20 +5,16 @@
  * Security: Bearer Token Auth
  */
 
+import { checkAdminAuth } from './_auth.js';
+
 export async function onRequest(context) {
+
     const { request, env } = context;
 
     // 1. Security Check
-    const authHeader = request.headers.get('Authorization') || '';
-    const token = authHeader.replace('Bearer ', '').trim();
-    const validToken = (env.CF_ADMIN_TOKEN || '').trim();
+    const auth = checkAdminAuth(request, env);
+    if (!auth.authorized) return auth.response;
 
-    if (!token || token !== validToken) {
-        return new Response(JSON.stringify({ status: 'error', message: 'Unauthorized' }), {
-            status: 401,
-            headers: { 'Content-Type': 'application/json' }
-        });
-    }
 
     if (!env.DB) return new Response(JSON.stringify({ status: 'error', message: 'Database missing' }), {
         status: 500,

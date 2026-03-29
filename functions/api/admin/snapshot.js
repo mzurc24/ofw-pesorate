@@ -6,53 +6,18 @@
  * Version: 3.0.0 (Consistency Engine)
  */
 
-import { calculateRate, EMERGENCY_RATES } from '../rates.js';
+import { calculateRate, EMERGENCY_RATES, SUPPORTED_COUNTRIES } from '../rates.js';
+import { checkAdminAuth } from './_auth.js';
 
-const SUPPORTED_COUNTRIES = [
-    { code: 'SA', name: 'Saudi Arabia', currency: 'SAR' },
-    { code: 'AE', name: 'United Arab Emirates', currency: 'AED' },
-    { code: 'QA', name: 'Qatar', currency: 'QAR' },
-    { code: 'KW', name: 'Kuwait', currency: 'KWD' },
-    { code: 'OM', name: 'Oman', currency: 'OMR' },
-    { code: 'BH', name: 'Bahrain', currency: 'BHD' },
-    { code: 'GB', name: 'United Kingdom', currency: 'GBP' },
-    { code: 'IT', name: 'Italy', currency: 'EUR' },
-    { code: 'ES', name: 'Spain', currency: 'EUR' },
-    { code: 'DE', name: 'Germany', currency: 'EUR' },
-    { code: 'FR', name: 'France', currency: 'EUR' },
-    { code: 'NL', name: 'Netherlands', currency: 'EUR' },
-    { code: 'CH', name: 'Switzerland', currency: 'CHF' },
-    { code: 'NO', name: 'Norway', currency: 'NOK' },
-    { code: 'SE', name: 'Sweden', currency: 'SEK' },
-    { code: 'SG', name: 'Singapore', currency: 'SGD' },
-    { code: 'HK', name: 'Hong Kong', currency: 'HKD' },
-    { code: 'MY', name: 'Malaysia', currency: 'MYR' },
-    { code: 'TW', name: 'Taiwan', currency: 'TWD' },
-    { code: 'JP', name: 'Japan', currency: 'JPY' },
-    { code: 'KR', name: 'South Korea', currency: 'KRW' },
-    { code: 'CN', name: 'China', currency: 'CNY' },
-    { code: 'TH', name: 'Thailand', currency: 'THB' },
-    { code: 'US', name: 'United States', currency: 'USD' },
-    { code: 'CA', name: 'Canada', currency: 'CAD' },
-    { code: 'MX', name: 'Mexico', currency: 'MXN' },
-    { code: 'AU', name: 'Australia', currency: 'AUD' },
-    { code: 'NZ', name: 'New Zealand', currency: 'NZD' }
-];
+
 
 export async function onRequest(context) {
     const { request, env } = context;
 
     // 1. Security Check
-    const authHeader = request.headers.get('Authorization') || '';
-    const token = authHeader.replace('Bearer ', '').trim();
-    const validToken = (env.CF_ADMIN_TOKEN || '').trim();
+    const auth = checkAdminAuth(request, env);
+    if (!auth.authorized) return auth.response;
 
-    if (!token || token !== validToken) {
-        return new Response(JSON.stringify({ status: 'error', message: 'Unauthorized' }), {
-            status: 401,
-            headers: { 'Content-Type': 'application/json' }
-        });
-    }
 
     if (!env.DB) return new Response(JSON.stringify({ status: 'error', message: 'Database missing' }), {
         status: 500,
@@ -60,7 +25,8 @@ export async function onRequest(context) {
     });
 
     try {
-        let ratesRow = await env.DB.prepare("SELECT rates_json, updated_at FROM rates_cache WHERE base_currency = 'EUR'").first();
+        let ratesRow = await env.DB.prepare("SELECT rates_json, updated_at FROM rates_cache WHERE base_currency = 'USD'").first();
+
         
         let allRates = null;
         if (ratesRow) {

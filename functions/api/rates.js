@@ -12,38 +12,23 @@ const CACHE_TTL = 7200; // 2 hours in seconds — nearly-live data feed
 
 // All currency pairs fetched as EUR/{currency} — maintains the EUR-base format
 // that calculateRate() requires. 1 batch HTTP call = 24 credits.
-export const TWELVE_SYMBOLS = [
-  'EUR/USD', 'EUR/PHP', 'EUR/SGD', 'EUR/JPY', 'EUR/GBP',
-  'EUR/SAR', 'EUR/AED', 'EUR/QAR', 'EUR/KWD', 'EUR/OMR',
-  'EUR/BHD', 'EUR/CAD', 'EUR/AUD', 'EUR/NZD', 'EUR/CHF',
-  'EUR/NOK', 'EUR/SEK', 'EUR/HKD', 'EUR/MYR', 'EUR/TWD',
-  'EUR/KRW', 'EUR/CNY', 'EUR/THB', 'EUR/MXN'
-].join(',');
+import { 
+  TWELVE_SYMBOLS, 
+  COUNTRY_CURRENCY_MAP, 
+  CURRENCY_SYMBOLS, 
+  EMERGENCY_RATES,
+  SUPPORTED_COUNTRIES
+} from '../_shared/constants.js';
 
-// Official Country to Currency Mapping (24 Regions Supported)
-export const COUNTRY_CURRENCY_MAP = {
-  'SA': 'SAR', 'AE': 'AED', 'QA': 'QAR', 'KW': 'KWD', 'OM': 'OMR', 'BH': 'BHD',
-  'GB': 'GBP', 'IT': 'EUR', 'ES': 'EUR', 'DE': 'EUR', 'FR': 'EUR', 'NL': 'EUR',
-  'CH': 'CHF', 'NO': 'NOK', 'SE': 'SEK', 'SG': 'SGD', 'HK': 'HKD', 'MY': 'MYR',
-  'TW': 'TWD', 'JP': 'JPY', 'KR': 'KRW', 'CN': 'CNY', 'TH': 'THB', 'US': 'USD',
-  'CA': 'CAD', 'MX': 'MXN', 'AU': 'AUD', 'NZ': 'NZD', 'PH': 'PHP'
+export { 
+  TWELVE_SYMBOLS, 
+  COUNTRY_CURRENCY_MAP, 
+  CURRENCY_SYMBOLS, 
+  EMERGENCY_RATES,
+  SUPPORTED_COUNTRIES
 };
 
-// Global Currency Symbols for UI
-export const CURRENCY_SYMBOLS = {
-  'SAR': '﷼', 'AED': 'د.إ', 'QAR': '﷼', 'KWD': 'د.ك', 'OMR': '﷼', 'BHD': '.د.ب',
-  'GBP': '£', 'EUR': '€', 'CHF': 'CHF', 'NOK': 'kr', 'SEK': 'kr', 'SGD': '$',
-  'HKD': '$', 'MYR': 'RM', 'TWD': 'NT$', 'JPY': '¥', 'KRW': '₩', 'CNY': '¥',
-  'THB': '฿', 'USD': '$', 'CAD': '$', 'MXN': '$', 'AUD': '$', 'NZD': '$', 'PHP': '₱'
-};
 
-export const EMERGENCY_RATES = {
-  USD: 1.08, PHP: 63.5, SGD: 1.45, JPY: 162.0, GBP: 0.855,
-  SAR: 4.05, AED: 3.97, QAR: 3.93, KWD: 0.332, OMR: 0.416,
-  BHD: 0.407, EUR: 1.00, CAD: 1.50, AUD: 1.69, NZD: 1.85,
-  CHF: 0.96, NOK: 11.55, SEK: 11.20, HKD: 8.42, MYR: 4.82,
-  TWD: 34.90, KRW: 1460, CNY: 7.85, THB: 37.50, MXN: 21.8
-};
 
 /**
  * Normalization Engine — UNCHANGED from original.
@@ -51,10 +36,11 @@ export const EMERGENCY_RATES = {
  * Standardizes all calculations to 8 decimal places to prevent drift.
  */
 export function calculateRate(rates, from, to) {
-  const eurToSource = rates[from] || EMERGENCY_RATES[from] || 1;
-  const eurToTarget = rates[to]   || EMERGENCY_RATES[to]   || 1;
-  return parseFloat((eurToTarget / eurToSource).toFixed(8));
+  const usdToSource = rates[from] || EMERGENCY_RATES[from] || 1;
+  const usdToTarget = rates[to]   || EMERGENCY_RATES[to]   || 1;
+  return parseFloat((usdToTarget / usdToSource).toFixed(8));
 }
+
 
 /**
  * Fetch all rates from Twelve Data batch price endpoint.
@@ -84,8 +70,9 @@ async function fetchFromTwelveData(apiKey) {
     throw new Error(`Twelve Data API error: ${data.message || 'Unknown error'}`);
   }
 
-  // Transform batch response → EUR-based rates object
-  const rates = { EUR: 1.0 };
+  // Transform batch response → USD-based rates object
+  const rates = { USD: 1.0 };
+
   let successCount = 0;
 
   for (const [pair, val] of Object.entries(data)) {
@@ -164,8 +151,9 @@ export async function onRequest(context) {
     if (env.DB) {
       try {
         const row = await env.DB.prepare(
-          "SELECT rates_json, updated_at FROM rates_cache WHERE base_currency = 'EUR'"
+          "SELECT rates_json, updated_at FROM rates_cache WHERE base_currency = 'USD'"
         ).first();
+
         if (row) cached = { rates: JSON.parse(row.rates_json), timestamp: row.updated_at };
       } catch (e) {
         console.error('D1 cache read failed:', e.message);
@@ -229,8 +217,9 @@ export async function onRequest(context) {
       try {
         const nowStamp = Date.now();
         await env.DB.prepare(
-          "REPLACE INTO rates_cache (base_currency, rates_json, updated_at) VALUES ('EUR', ?, ?)"
+          "REPLACE INTO rates_cache (base_currency, rates_json, updated_at) VALUES ('USD', ?, ?)"
         ).bind(JSON.stringify(fetchedRates), nowStamp).run();
+
         // Write both the new key and legacy key so validate.js / system.js still work
         await env.DB.prepare(
           "REPLACE INTO settings (key, value) VALUES ('last_twelvedata_fetch', ?)"

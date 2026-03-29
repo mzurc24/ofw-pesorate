@@ -1,21 +1,18 @@
+import { checkAdminAuth } from './_auth.js';
+
 export async function onRequest(context) {
+
     const { request, env } = context;
 
-    // Optional basic auth check (same as other admin APIs)
-    const url = new URL(request.url);
-    const validToken = (env.CF_ADMIN_TOKEN || '').trim();
-    const authHeader = request.headers.get('Authorization');
-    const urlToken = url.searchParams.get('t');
-
-    let isAuthorized = false;
-    if (validToken) {
-        if (urlToken === validToken) isAuthorized = true;
-        else if (authHeader && authHeader.replace('Bearer ', '').trim() === validToken) isAuthorized = true;
+    // 1. Security Check
+    const auth = checkAdminAuth(request, env);
+    if (!auth.authorized) {
+        // Fallback for URL parameter 't' for quick diagnostic resets
+        const urlToken = new URL(request.url).searchParams.get('t');
+        const validToken = (env.CF_ADMIN_TOKEN || '').trim();
+        if (!validToken || urlToken !== validToken) return auth.response;
     }
 
-    if (!isAuthorized) {
-        return new Response(JSON.stringify({ status: 'error', message: 'Unauthorized' }), { status: 401 });
-    }
 
     try {
         await env.DB.batch([

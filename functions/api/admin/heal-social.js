@@ -1,20 +1,13 @@
-/**
- * /api/admin/heal-social
- * Explicitly triggers a Cloudflare CDN purge and resets social failure state.
- * Requires: Bearer Token Auth (env.CF_ADMIN_TOKEN)
- */
+import { checkAdminAuth } from './_auth.js';
 
 export async function onRequest(context) {
+
     const { request, env } = context;
 
-    // 1. Auth check
-    const authHeader = request.headers.get('Authorization') || '';
-    const token = authHeader.replace('Bearer ', '').trim();
-    const validToken = (env.CF_ADMIN_TOKEN || '').trim();
+    // 1. Security Check
+    const auth = checkAdminAuth(request, env);
+    if (!auth.authorized) return auth.response;
 
-    if (!token || token !== validToken) {
-        return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
-    }
 
     if (request.method !== 'POST') {
         return new Response(null, { status: 405 });

@@ -1,7 +1,13 @@
 (() => {
     'use strict';
 
+    // Detect if running inside a social media in-app browser (FB, Instagram, etc.)
+    const isSocialWebviewDetection = /FBAN|FBAV|Instagram|WhatsApp|Messenger/i.test(navigator.userAgent);
+    window.isSocialWebview = isSocialWebviewDetection;
+
+
     // ── Progressive Web App (PWA) Initialization ─────────────────────────────
+
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
             navigator.serviceWorker.register('/sw.js').catch(err => {
@@ -45,10 +51,19 @@
     const targetSymbolEl        = document.getElementById('target-symbol');
     const lastUpdatedEl         = document.getElementById('last-updated');
     const refreshBtn            = document.getElementById('refresh-btn');
-    
-    // PH Mode Switcher
-    const phSelectorContainer   = document.getElementById('ph-selector-container');
+    const alertBtn              = document.getElementById('alert-btn');
+    const alertModal            = document.getElementById('alert-modal');
+    const alertForm             = document.getElementById('alert-form');
+    const secondaryReference    = document.getElementById('secondary-reference');
+    const secondaryRateEl       = document.getElementById('secondary-rate');
     const baseCurrencySelect    = document.getElementById('base-currency-select');
+
+    const closeAlertBtn         = document.getElementById('close-alert-modal');
+
+    
+    // UI Elements
+    const phSelectorContainer   = document.getElementById('ph-selector-container');
+
 
     // ── Local State ──────────────────────────────────────────────────────────
     let userName         = localStorage.getItem('ofw_pesorate_name');
@@ -100,18 +115,98 @@
     async function showDashboard(name) {
         if (dashboardDiv) dashboardDiv.classList.remove('hidden');
         if (greetingEl) greetingEl.textContent = `Hello, ${name} 👋`;
-        await fetchRate(name, userId, false, currentCurrency);
+        
+        // Sync Base Currency Selector with localStorage
+        const preferred = localStorage.getItem('ofw_pesorate_base');
+        if (preferred && baseCurrencySelect) {
+            baseCurrencySelect.value = preferred;
+        }
+
+        await fetchRate(name, userId, false, preferred || currentCurrency);
     }
+
 
     refreshBtn.addEventListener('click', () => {
         fetchRate(userName, userId, true, currentCurrency);
     });
 
     baseCurrencySelect.addEventListener('change', (e) => {
-        currentCurrency = e.target.value;
-        localStorage.setItem('ofw_pesorate_base', currentCurrency);
-        fetchRate(userName, userId, true, currentCurrency);
+        const newCurrency = e.target.value;
+        currentCurrency = newCurrency;
+        localStorage.setItem('ofw_pesorate_base', newCurrency);
+        
+        // Asynchronously save to D1
+        fetch('/api/user/preferences', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-user-id': userId },
+            body: JSON.stringify({ preferred_currency: newCurrency })
+        }).catch(() => {});
+
+        fetchRate(userName, userId, true, newCurrency);
     });
+
+
+    // ── Alert Modal Logic ───────────────────────────────────────────────────
+    if (alertBtn && alertModal && closeAlertBtn) {
+        alertBtn.addEventListener('click', () => {
+            alertModal.classList.remove('hidden');
+        });
+
+        closeAlertBtn.addEventListener('click', () => {
+            alertModal.classList.add('hidden');
+        });
+
+        alertModal.addEventListener('click', (e) => {
+            if (e.target === alertModal) alertModal.classList.add('hidden');
+        });
+    }
+
+    if (alertForm) {
+        alertForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const submitBtn = alertForm.querySelector('button[type="submit"]');
+            const originalText = submitBtn.textContent;
+            
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Setting Alert...';
+
+            const payload = {
+                base: currentCurrency || 'SGD',
+                target: 'PHP',
+                threshold: document.getElementById('alert-threshold').value,
+                direction: document.getElementById('alert-direction').value,
+                webhook: document.getElementById('alert-webhook').value
+            };
+
+            try {
+                const res = await fetch('/api/subscribe', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-user-id': userId
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await res.json();
+                if (res.ok) {
+                    alert('✅ ' + data.message);
+                    alertModal.classList.add('hidden');
+                    alertForm.reset();
+                } else {
+                    alert('❌ ' + (data.message || 'Failed to set alert'));
+                }
+            } catch (err) {
+                alert('❌ Connection error. Please try again.');
+            } finally {
+                window.appLoaded = true; // Safety: Never lock the user out with a permanent fallback
+                submitBtn.disabled = false;
+                submitBtn.textContent = originalText;
+            }
+
+        });
+    }
+
 
     async function fetchRate(name, id, isRefresh = false, currency = null) {
         if (isRefresh) {
@@ -125,11 +220,16 @@
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 3000); // 3s timeout for production stability
 
+            const savedCountry = localStorage.getItem('ofw_pesorate_country') || sessionStorage.getItem('ofw_pesorate_country') || '';
+            const browserLocale = navigator.language || navigator.userLanguage || '';
+
             const res = await fetch(url, {
                 signal: controller.signal,
                 headers: {
                     'x-user-id': id,
-                    'x-user-name': encodeURIComponent(name || '')
+                    'x-user-name': encodeURIComponent(name || ''),
+                    'x-client-country': savedCountry,
+                    'x-browser-locale': browserLocale
                 }
             });
             clearTimeout(timeoutId);
@@ -142,6 +242,12 @@
             const dot = document.querySelector('.dot');
             const lastUpdated = document.getElementById('last-updated');
             
+            // Persist securely detected country uniformly across session/local storage
+            if (data.country) {
+                localStorage.setItem('ofw_pesorate_country', data.country);
+                sessionStorage.setItem('ofw_pesorate_country', data.country);
+            }
+            
             if (data.status === 'DEGRADED') {
                 if (dot) {
                     dot.style.background = '#ff9500'; // Orange for degraded
@@ -150,18 +256,42 @@
                 if (lastUpdated) lastUpdated.textContent = 'Degraded Mode';
             } else {
                 if (dot) {
-                    dot.style.background = 'var(--success)';
-                    dot.style.boxShadow = '0 0 10px var(--success)';
+                    dot.style.background = '#22c55e'; // Success green
+                    dot.style.boxShadow = '0 0 10px rgba(34,197,94,0.4)';
                 }
             }
             
-            // Render UI
+            // Render UI with Fallbacks
+            const from = data.from_currency || 'SGD';
+            const to = data.to_currency || 'PHP';
+            const rateRaw = data.rate;
+            const rate = (rateRaw && !isNaN(rateRaw)) ? parseFloat(rateRaw).toFixed(2) : '--.--';
+
             greetingEl.textContent = `Hello, ${name} \u{1F44B}`;
             greetingSubEl.textContent = `Real-time exchange rates`;
 
+            // Dual-Currency Rendering (Premium UX)
+            if (data.is_ph) {
+                secondaryReference.classList.remove('hidden');
+                // Strict Rule: If base is USD, show (~₱[rate]). If other, show (~$[usd_equiv]).
+                if (from === 'USD') {
+                    secondaryRateEl.textContent = rate;
+                    secondaryReference.innerHTML = `(~₱${rate})`;
+                } else {
+                    const usdEquiv = (data.rate / (data.usd_rate || 56.4)).toFixed(2);
+                    secondaryRateEl.textContent = usdEquiv;
+                    secondaryReference.innerHTML = `(~$${usdEquiv})`;
+                }
+            } else {
+                secondaryReference.classList.add('hidden');
+            }
+
+
+
             // Social Mode Fast-path UI adjustments
-            const isSocialMode = data.social_mode || isSocialWebview;
+            const isSocialMode = data.social_mode || window.isSocialWebview;
             if (isSocialMode) {
+
                 // Remove heavy backdrop blur in social mode for faster rendering
                 if (dashboardDiv) {
                     dashboardDiv.style.backdropFilter = 'none';

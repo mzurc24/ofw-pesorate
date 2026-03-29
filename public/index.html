@@ -590,13 +590,55 @@
                 width: 90vw;
                 padding: 24px;
             }
-
             .rate-value {
                 font-size: 3.2rem;
             }
         }
 
+        .rate-value {
+            font-size: 4rem;
+            font-weight: 800;
+            letter-spacing: -2px;
+            margin: 10px 0;
+            color: var(--text-primary);
+        }
+
+        .secondary-value {
+            font-size: 1rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+            opacity: 0.7;
+            margin-top: -5px;
+            margin-bottom: 15px;
+        }
+
         /* ── Social Mode (Lightweight Fast-Paint Mode) ── */
+
+
+        .footer .btn-group {
+            display: flex;
+            gap: 12px;
+        }
+
+        @media (max-width: 480px) {
+            .footer {
+                display: flex;
+                flex-direction: column;
+                gap: 16px;
+                align-items: center;
+            }
+            .footer .btn-group {
+                width: 100%;
+                justify-content: center;
+                gap: 16px;
+            }
+            .refresh-btn {
+                flex: 1;
+                text-align: center;
+                justify-content: center;
+            }
+        }
+
         .social-mode .slideshow-container,
         .social-mode .glass-overlay,
         .social-mode .gradient-overlay {
@@ -614,7 +656,60 @@
             box-shadow: 0 4px 24px rgba(0,0,0,0.4) !important;
         }
 
-        /* Disable CPU-heavy animations in social webviews */
+        /* — Alert Modal — */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(10px);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 0.3s ease;
+        }
+
+        .modal-card {
+            width: 380px;
+            background: rgba(255, 255, 255, 0.75);
+            backdrop-filter: blur(30px) saturate(180%);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            padding: 24px;
+            box-shadow: 0 40px 100px rgba(0, 0, 0, 0.2);
+            animation: modal-pop 0.4s var(--easing);
+        }
+
+        @keyframes modal-pop {
+            0% { transform: scale(0.9) translateY(20px); opacity: 0; }
+            100% { transform: scale(1) translateY(0); opacity: 1; }
+        }
+
+        .alert-form label {
+            display: block;
+            font-size: 0.8rem;
+            font-weight: 700;
+            margin-bottom: 6px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+        }
+
+        .alert-form select, .alert-form input {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 16px;
+            border-radius: 12px;
+            border: 1px solid rgba(0, 0, 0, 0.05);
+            background: rgba(255, 255, 255, 0.5);
+            font-size: 0.95rem;
+            outline: none;
+        }
+
+        .alert-form select:focus, .alert-form input:focus {
+            border-color: var(--accent);
+            background: white;
+        }
+
         .social-mode *,
         .social-mode *::before,
         .social-mode *::after {
@@ -730,31 +825,39 @@
 
         <div class="rate-container">
             <div class="rate-label" id="currency-pair">
-                <!-- Static Label (Default) -->
-                <span id="base-currency-label">1 SGD</span>
-
-                <!-- PH Mode Selector (Hidden by default) -->
-                <div id="ph-selector-container" class="currency-selector-container">
+                <!-- Universal Currency Selector -->
+                <div id="currency-selector-container" class="currency-selector-container active">
                     <span>1</span>
                     <select id="base-currency-select" class="currency-select">
-                        <option value="SGD">SGD</option>
-                        <option value="USD">USD</option>
-                        <option value="SAR">SAR</option>
-                        <option value="AED">AED</option>
-                        <option value="QAR">QAR</option>
-                        <option value="KWD">KWD</option>
-                        <option value="OMR">OMR</option>
-                        <option value="BHD">BHD</option>
-                        <option value="GBP">GBP</option>
-                        <option value="EUR">EUR</option>
-                        <option value="HKD">HKD</option>
-                        <option value="MYR">MYR</option>
-                        <option value="TWD">TWD</option>
-                        <option value="JPY">JPY</option>
-                        <option value="KRW">KRW</option>
-                        <option value="CNY">CNY</option>
+                        <option value="SGD">SGD (S$)</option>
+                        <option value="PHP">PHP (₱)</option>
+                        <option value="USD">USD ($)</option>
+                        <option value="SAR">SAR (﷼)</option>
+                        <option value="AED">AED (د.إ)</option>
+                        <option value="GBP">GBP (£)</option>
+                        <option value="EUR">EUR (€)</option>
+                        <option value="JPY">JPY (¥)</option>
+                        <option value="MYR">RM</option>
+                        <option value="HKD">HKD (HK$)</option>
+                        <!-- GCC Additions -->
+                        <option value="QAR">QAR (﷼)</option>
+                        <option value="KWD">KWD (د.ك)</option>
+                        <option value="OMR">OMR (﷼)</option>
+                        <option value="BHD">BHD (.د.ب)</option>
+                        <!-- CAN/AUS/NZ Additions -->
+                        <option value="CAD">CAD ($)</option>
+                        <option value="AUD">AUD ($)</option>
+                        <option value="NZD">NZD ($)</option>
+                        <!-- South/East Asia Additions -->
+                        <option value="TWD">TWD (NT$)</option>
+                        <option value="KRW">KRW (₩)</option>
+                        <option value="CNY">CNY (¥)</option>
+                        <option value="THB">THB (฿)</option>
+                        <option value="IDR">IDR (Rp)</option>
+                        <option value="VND">VND (₫)</option>
                     </select>
                 </div>
+
 
                 <svg class="arrow-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                     stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -763,7 +866,13 @@
                 </svg>
                 <span id="target-currency-label">PHP</span>
             </div>
-            <div class="rate-value"><span id="target-symbol">₱</span><span id="rate-value">--.--</span></div>
+            <div class="rate-value">
+                <span id="target-symbol">₱</span><span id="rate-value">--.--</span>
+            </div>
+            <div id="secondary-reference" class="secondary-value hidden">
+                (~$<span id="secondary-rate">--.--</span>)
+            </div>
+
             
             <!-- 7-Day Sparkline Trend Chart -->
             <canvas id="trend-chart" width="300" height="50" style="margin-top: 16px; opacity: 0.8; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.1)); width: 100%; max-width: 300px; display: block; margin-left: auto; margin-right: auto;"></canvas>
@@ -774,11 +883,46 @@
                 <div class="dot pulse"></div>
                 <span id="last-updated">Updating...</span>
             </div>
-            <button class="refresh-btn" id="refresh-btn">Refresh</button>
+            <div style="display:flex; gap:10px">
+                <button class="refresh-btn" id="alert-btn" style="background:rgba(0,113,227,0.1); border-color:rgba(0,113,227,0.2); color:var(--accent)">Alerts</button>
+                <button class="refresh-btn" id="refresh-btn">Refresh</button>
+            </div>
         </div>
     </div>
 
-    <script src="app.js?v=4.2.0"></script>
+    <!-- Alert Subscription Modal -->
+    <div id="alert-modal" class="modal-overlay hidden">
+        <div class="modal-card">
+            <h3 style="font-size: 1.4rem; font-weight: 800; margin-bottom: 8px; letter-spacing: -0.03em;">Rate Alerts</h3>
+            <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 24px;">Get notified via Discord/Slack when the rate hits your target.</p>
+            
+            <form id="alert-form" class="alert-form">
+                <label>When 1 SGD is</label>
+                <div style="display:flex; gap:10px; margin-bottom:16px">
+                    <select id="alert-direction" style="flex:1; margin-bottom:0">
+                        <option value="above">Above</option>
+                        <option value="below">Below</option>
+                    </select>
+                    <input type="number" id="alert-threshold" step="0.01" placeholder="e.g. 43.50" style="flex:2; margin-bottom:0">
+                </div>
+
+                <label>Notify me via Webhook</label>
+                <input type="url" id="alert-webhook" placeholder="Discord/Slack Webhook URL" required>
+
+                <div style="display:flex; gap:12px; margin-top:12px">
+                    <button type="button" id="close-alert-modal" style="flex:1; padding:14px; border-radius:14px; border:1px solid rgba(0,0,0,0.1); background:transparent; font-weight:600; cursor:pointer">Cancel</button>
+                    <button type="submit" style="flex:2; padding:14px; border-radius:14px; background:var(--accent); color:white; border:none; font-weight:700; cursor:pointer; box-shadow: 0 4px 12px rgba(0,113,227,0.3)">Set Alert</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+
+    <script src="app.js?v=4.5.1"></script>
+
+
+
+
 </body>
 
 </html>

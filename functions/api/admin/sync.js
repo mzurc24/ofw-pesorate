@@ -11,27 +11,18 @@
  * Daily guard: hard cap at 700 credits/day (leaves 100 buffer)
  */
 
-// All EUR-based pairs — same list as rates.js
-const TWELVE_SYMBOLS = [
-  'EUR/USD', 'EUR/PHP', 'EUR/SGD', 'EUR/JPY', 'EUR/GBP',
-  'EUR/SAR', 'EUR/AED', 'EUR/QAR', 'EUR/KWD', 'EUR/OMR',
-  'EUR/BHD', 'EUR/CAD', 'EUR/AUD', 'EUR/NZD', 'EUR/CHF',
-  'EUR/NOK', 'EUR/SEK', 'EUR/HKD', 'EUR/MYR', 'EUR/TWD',
-  'EUR/KRW', 'EUR/CNY', 'EUR/THB', 'EUR/MXN'
-].join(',');
+import { TWELVE_SYMBOLS, EMERGENCY_RATES } from '../../_shared/constants.js';
+import { calculateRate } from '../rates.js';
+import { checkAdminAuth } from './_auth.js';
 
-const EMERGENCY_RATES = {
-  USD: 1.08, PHP: 63.5, SGD: 1.45, JPY: 162.0, GBP: 0.855,
-  SAR: 4.05, AED: 3.97, QAR: 3.93, KWD: 0.332, OMR: 0.416,
-  BHD: 0.407, EUR: 1.00, CAD: 1.50, AUD: 1.69, NZD: 1.85,
-  CHF: 0.96, NOK: 11.55, SEK: 11.20, HKD: 8.42, MYR: 4.82,
-  TWD: 34.90, KRW: 1460, CNY: 7.85, THB: 37.50, MXN: 21.8
-};
+
+
 
 /**
- * Fetch a batch of EUR-based rates from Twelve Data.
- * Returns the same format as the old Fixer.io response: { USD: 1.08, PHP: 63.5, EUR: 1.0, ... }
+ * Fetch a batch of USD-based rates from Twelve Data.
+ * Returns the same format as the old Fixer.io response: { PHP: 56.4, EUR: 0.92, USD: 1.0, ... }
  */
+
 async function fetchFromTwelveData(apiKey) {
   const url = `https://api.twelvedata.com/price?symbol=${TWELVE_SYMBOLS}&apikey=${apiKey}`;
 
@@ -52,7 +43,8 @@ async function fetchFromTwelveData(apiKey) {
     throw new Error(`Twelve Data API error: ${data.message || 'Auth or plan issue'}`);
   }
 
-  const rates = { EUR: 1.0 };
+  const rates = { USD: 1.0 };
+
   let successCount = 0;
 
   for (const [pair, val] of Object.entries(data)) {
@@ -81,16 +73,9 @@ export async function onRequest(context) {
   const { request, env } = context;
 
   // 1. Security Check
-  const authHeader = request.headers.get('Authorization') || '';
-  const token = authHeader.replace('Bearer ', '').trim();
-  const validToken = (env.CF_ADMIN_TOKEN || '').trim();
+  const auth = checkAdminAuth(request, env);
+  if (!auth.authorized) return auth.response;
 
-  if (!token || token !== validToken) {
-    return new Response(JSON.stringify({ status: 'error', message: 'Unauthorized' }), {
-      status: 401,
-      headers: { 'Content-Type': 'application/json' }
-    });
-  }
 
   const now = Date.now();
   // Daily tracking key (YYYY-MM-DD) — stored in api_usage table
@@ -132,21 +117,9 @@ export async function onRequest(context) {
         await env.DB.prepare("REPLACE INTO settings (key, value) VALUES ('td_fail_count', '0')").run();
     }
 
-    // C. Throttle Check — 1 hour minimum interval between syncs
-    // This is the PRIMARY protection against over-fetching.
-    // GitHub Actions CRON enforces the schedule — this is a second-layer guard.
-    const SYNC_INTERVAL_MS = 1 * 60 * 60 * 1000; // 1 hour
+    // C. Sync is now unconditional when triggered by admin API (schedule runner)
+    // The daily quota guard (700) remains as the primary budget protector.
 
-    if (now - lastSync < SYNC_INTERVAL_MS) {
-      return new Response(JSON.stringify({
-        status: 'success', // legacy compat
-        result: 'HEALTHY',
-        data_source: 'CACHE',
-        message: 'Data is fresh (within 2h window). Sync skipped to protect API quota.',
-        last_sync_mins_ago: Math.floor((now - lastSync) / 60000),
-        credits_used_today: dailyCalls
-      }), { headers: { 'Content-Type': 'application/json' } });
-    }
 
     // 3. Increment daily credit counter BEFORE the API call
     // Each call = 24 credits (one per currency pair)
@@ -194,8 +167,9 @@ export async function onRequest(context) {
     // 5. SUCCESS — update D1 cache and reset circuit breaker
     const ratesJson = JSON.stringify(fetchedRates);
     await env.DB.batch([
-      env.DB.prepare("REPLACE INTO rates_cache (base_currency, rates_json, updated_at) VALUES ('EUR', ?, ?)").bind(ratesJson, now),
+      env.DB.prepare("REPLACE INTO rates_cache (base_currency, rates_json, updated_at) VALUES ('USD', ?, ?)").bind(ratesJson, now),
       env.DB.prepare("REPLACE INTO settings (key, value) VALUES ('last_twelvedata_fetch', ?)").bind(now.toString()),
+
       env.DB.prepare("REPLACE INTO settings (key, value) VALUES ('last_fixer_fetch', ?)").bind(now.toString()), // legacy compat
       env.DB.prepare("REPLACE INTO settings (key, value) VALUES ('last_successful_sync', ?)").bind(now.toString()),
       env.DB.prepare("REPLACE INTO settings (key, value) VALUES ('td_fail_count', '0')"),
@@ -203,7 +177,15 @@ export async function onRequest(context) {
       env.DB.prepare("INSERT INTO api_logs (endpoint, status) VALUES (?, ?)").bind('/api/admin/sync', 'success_twelve_data')
     ]);
 
+    // 6. Trigger User-Facing Rate Alerts (Async Hook)
+    // We don't await this to avoid blocking the sync response, but we use waitUntil if available.
+    const alertPromise = triggerUserAlerts(context, fetchedRates);
+    if (context.waitUntil) {
+      context.waitUntil(alertPromise);
+    }
+
     return new Response(JSON.stringify({
+
       status: 'success',
       result: 'HEALTHY',
       data_source: 'TWELVE_DATA',
@@ -224,4 +206,73 @@ export async function onRequest(context) {
     });
   }
 }
+
+/**
+ * Alert Engine: Check user-defined thresholds and trigger webhooks.
+ */
+async function triggerUserAlerts(context, rates) {
+  const { env } = context;
+  if (!env.DB) return;
+
+  try {
+    // 1. Fetch all active subscriptions
+    const { results: subs } = await env.DB.prepare(
+      "SELECT * FROM alert_subscriptions WHERE status = 'active'"
+    ).all();
+
+    if (!subs || subs.length === 0) return;
+
+    const now = Date.now();
+    const alertResults = [];
+
+    for (const sub of subs) {
+      // 2. Calculate current rate for the pair
+      const currentRate = calculateRate(rates, sub.base_currency, sub.target_currency);
+      
+      // 3. Evaluate condition
+      let triggered = false;
+      if (sub.direction === 'above' && currentRate >= sub.threshold) triggered = true;
+      if (sub.direction === 'below' && currentRate <= sub.threshold) triggered = true;
+
+      // 4. Cooldown check: 24h (86400000ms) to prevent notification fatigue
+      const isCooldownOver = (now - (sub.last_triggered || 0)) > 24 * 60 * 60 * 1000;
+
+      if (triggered && isCooldownOver) {
+        // 5. Build and Send Webhook (Discord/Slack compatible)
+        const message = {
+          content: `🔔 **OFW Rate Alert**\n\nThe ${sub.base_currency} to ${sub.target_currency} rate is now **₱${currentRate.toFixed(2)}**.\n(Threshold: ${sub.direction} ₱${sub.threshold.toFixed(2)})\n\nTrack live: https://ofwpesorate.madzlab.site/`
+        };
+
+        try {
+          const res = await fetch(sub.webhook_url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(message)
+          });
+
+          if (res.ok) {
+            // 6. Update last_triggered timestamp
+            await env.DB.prepare(
+              "UPDATE alert_subscriptions SET last_triggered = ? WHERE id = ?"
+            ).bind(now, sub.id).run();
+            
+            alertResults.push({ id: sub.id, status: 'sent' });
+          } else {
+             console.error(`Alert failed for sub ${sub.id}: HTTP ${res.status}`);
+          }
+        } catch (e) {
+          console.error(`Alert fetch error for sub ${sub.id}:`, e.message);
+        }
+      }
+    }
+    
+    if (alertResults.length > 0) {
+      console.log(`Alert Engine: Triggered ${alertResults.length} notifications.`);
+    }
+
+  } catch (e) {
+    console.error('Alert Engine Fatal Error:', e.message);
+  }
+}
+
 
