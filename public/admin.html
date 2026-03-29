@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard | OFW PesoRate</title>
+    <meta name="robots" content="noindex, nofollow">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --bg: #0a0f1e;
+            --surface: #0f1629;
+            --glass-bg: rgba(255,255,255,0.04);
+            --glass-border: rgba(255,255,255,0.08);
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --text-muted: #475569;
+            --accent: #3b82f6;
+            --success: #22c55e;
+            --success-soft: rgba(34,197,94,0.1);
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --radius: 14px;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        .hidden { display: none !important; }
+
+        /* ── Auth Overlay ── */
+        #auth-overlay {
+            position: fixed; inset: 0; z-index: 1000;
+            background: rgba(10,15,30,0.97);
+            display: flex; align-items: center; justify-content: center;
+        }
+        .auth-card {
+            background: var(--surface);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            padding: 40px;
+            width: 360px;
+            text-align: center;
+        }
+        .auth-card h2 { font-size: 1.4rem; margin-bottom: 8px; }
+        .auth-card p { color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 24px; }
+        #admin-token-input {
+            width: 100%; padding: 12px 16px;
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 10px; color: var(--text-primary);
+            font-family: monospace; font-size: 1rem;
+            outline: none; margin-bottom: 12px;
+        }
+        #login-btn {
+            width: 100%; padding: 13px;
+            background: var(--accent); color: white;
+            border: none; border-radius: 10px;
+            font-size: 0.95rem; font-weight: 600;
+            cursor: pointer; transition: opacity 0.2s;
+        }
+        #login-btn:hover { opacity: 0.85; }
+        #auth-error {
+            margin-top: 12px; color: var(--danger);
+            font-size: 0.85rem;
+        }
+
+        /* ── Layout ── */
+        .admin-container { display: flex; min-height: 100vh; }
+
+        .sidebar {
+            width: 220px; flex-shrink: 0;
+            background: var(--surface);
+            border-right: 1px solid var(--glass-border);
+            padding: 24px 16px;
+            display: flex; flex-direction: column;
+        }
+        .sidebar-logo {
+            display: flex; align-items: center; gap: 10px;
+            padding: 8px 12px; margin-bottom: 32px;
+        }
+        .sidebar-logo .icon {
+            width: 36px; height: 36px; border-radius: 10px;
+            background: linear-gradient(135deg, #3b82f6, #6366f1);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 18px; font-weight: 700;
+        }
+        .sidebar-logo .name { font-size: 0.9rem; font-weight: 700; }
+        .sidebar-logo .badge { font-size: 0.65rem; color: var(--accent); }
+
+        .nav-item {
+            display: flex; align-items: center; gap: 10px;
+            padding: 10px 12px; border-radius: 10px;
+            cursor: pointer; color: var(--text-secondary);
+            font-size: 0.85rem; font-weight: 500;
+            transition: all 0.2s; margin-bottom: 4px;
+            border: none; background: none; width: 100%; text-align: left;
+        }
+        .nav-item:hover, .nav-item.active {
+            background: var(--glass-bg);
+            color: var(--text-primary);
+        }
+
+        .sidebar-footer { margin-top: auto; }
+        #logout-btn {
+            width: 100%; padding: 10px 12px;
+            background: rgba(239,68,68,0.1);
+            border: 1px solid rgba(239,68,68,0.2);
+            color: var(--danger); border-radius: 10px;
+            cursor: pointer; font-size: 0.85rem; font-weight: 500;
+            transition: all 0.2s;
+        }
+        #logout-btn:hover { background: rgba(239,68,68,0.2); }
+
+        .main-content { flex: 1; padding: 32px; overflow-y: auto; }
+
+        /* ── Status Bar ── */
+        .status-bar {
+            display: flex; align-items: center; gap: 20px;
+            background: var(--glass-bg); border: 1px solid var(--glass-border);
+            border-radius: var(--radius); padding: 14px 20px;
+            margin-bottom: 24px; flex-wrap: wrap;
+        }
+        .status-item { display: flex; align-items: center; gap: 8px; font-size: 0.8rem; }
+        .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-muted); }
+        .status-dot.healthy { background: var(--success); box-shadow: 0 0 6px var(--success); }
+        .status-dot.degraded { background: var(--warning); }
+        .status-dot.down, .status-dot.error { background: var(--danger); }
+
+        /* ── Section ── */
+        .section { margin-bottom: 28px; }
+        .section-title {
+            font-size: 0.75rem; font-weight: 700;
+            text-transform: uppercase; letter-spacing: 0.1em;
+            color: var(--text-muted); margin-bottom: 14px;
+        }
+
+        /* ── Stats Grid ── */
+        .stats-grid {
+            display: grid; grid-template-columns: repeat(4, 1fr);
+            gap: 14px; margin-bottom: 24px;
+        }
+        .stat-card {
+            background: var(--glass-bg); border: 1px solid var(--glass-border);
+            border-radius: var(--radius); padding: 20px;
+        }
+        .stat-label { font-size: 0.75rem; color: var(--text-muted); margin-bottom: 8px; }
+        .stat-value { font-size: 1.8rem; font-weight: 800; letter-spacing: -0.05em; }
+
+        /* ── Panel ── */
+        .panel {
+            background: var(--glass-bg); border: 1px solid var(--glass-border);
+            border-radius: var(--radius); padding: 20px; margin-bottom: 14px;
+        }
+        .panel-header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 16px;
+        }
+        .panel-title { font-size: 0.85rem; font-weight: 600; }
+
+        /* ── Rate Table ── */
+        .rate-table { width: 100%; border-collapse: collapse; }
+        .rate-table th {
+            font-size: 0.7rem; text-transform: uppercase;
+            color: var(--text-muted); padding: 8px 12px;
+            text-align: left; border-bottom: 1px solid var(--glass-border);
+        }
+        .rate-table td { padding: 10px 12px; font-size: 0.85rem; border-bottom: 1px solid rgba(255,255,255,0.03); }
+        .currency-code { font-weight: 700; font-size: 0.8rem; color: var(--accent); }
+        .flag { font-size: 1.1rem; }
+        .pill { font-size: 0.7rem; padding: 3px 8px; border-radius: 6px; font-weight: 600; }
+        .pill-success { background: rgba(34,197,94,0.1); color: var(--success); }
+        .pill-warning { background: rgba(245,158,11,0.1); color: var(--warning); }
+        .pill-danger { background: rgba(239,68,68,0.1); color: var(--danger); }
+
+        /* ── Bar Charts ── */
+        .bar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; font-size: 0.8rem; }
+        .bar-label { width: 60px; flex-shrink: 0; color: var(--text-secondary); }
+        .bar-track { flex: 1; height: 6px; background: rgba(255,255,255,0.05); border-radius: 3px; overflow: hidden; position: relative; }
+        .bar-fill { height: 100%; background: linear-gradient(90deg, var(--accent), #6366f1); border-radius: 3px; }
+        .bar-value { width: 40px; text-align: right; color: var(--text-secondary); flex-shrink: 0; }
+
+        /* ── Buttons ── */
+        .btn {
+            padding: 8px 16px; border-radius: 8px;
+            border: 1px solid var(--glass-border);
+            background: var(--glass-bg); color: var(--text-primary);
+            font-size: 0.8rem; font-weight: 600; cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn:hover { background: rgba(255,255,255,0.08); }
+        .btn-primary { background: var(--accent); border-color: var(--accent); color: white; }
+        .btn-primary:hover { opacity: 0.85; }
+
+        /* ── Grid Layouts ── */
+        .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+        .three-col { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+
+        /* ── DevOps ── */
+        .devops-verdict {
+            font-size: 1rem; font-weight: 800; padding: 6px 14px;
+            border-radius: 8px; border: 1px solid;
+        }
+
+        /* ── Log ── */
+        #log-body { font-family: monospace; font-size: 0.75rem; max-height: 200px; overflow-y: auto; }
+        .log-entry { padding: 4px 8px; border-radius: 4px; margin-bottom: 2px; }
+        .log-entry.success { color: var(--success); }
+        .log-entry.error { color: var(--danger); }
+        .log-entry.warn { color: var(--warning); }
+        .log-entry.info { color: var(--text-secondary); }
+
+        /* ── Canvas ── */
+        canvas { max-width: 100%; }
+
+        /* ── Trend tooltip ── */
+        #trend-tooltip {
+            position: absolute; background: var(--surface);
+            border: 1px solid var(--glass-border);
+            border-radius: 8px; padding: 8px 12px;
+            font-size: 0.75rem; pointer-events: none;
+            display: none; z-index: 100;
+        }
+
+        @media (max-width: 1024px) {
+            .stats-grid { grid-template-columns: repeat(2, 1fr); }
+            .two-col, .three-col { grid-template-columns: 1fr; }
+        }
+        @media (max-width: 768px) {
+            .sidebar { display: none; }
+            .main-content { padding: 16px; }
+            .stats-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+    </style>
+</head>
+<body>
+
+<!-- Auth Overlay (shown if no session token) -->
+<div id="auth-overlay">
+    <div class="auth-card">
+        <div style="font-size:2rem;margin-bottom:12px">🔐</div>
+        <h2>Admin Access</h2>
+        <p>Enter your admin token to continue</p>
+        <input type="password" id="admin-token-input" placeholder="Enter token (e.g. ofwAk026)" autocomplete="off">
+        <button id="login-btn">Secure Login</button>
+        <div id="auth-error" class="hidden">❌ Invalid token. Please try again.</div>
+    </div>
+</div>
+
+<div class="admin-container">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <div class="sidebar-logo">
+            <div class="icon">₱</div>
+            <div>
+                <div class="name">OFW PesoRate</div>
+                <div class="badge">ADMIN</div>
+            </div>
+        </div>
+
+        <button class="nav-item active">📊 Dashboard</button>
+        <button class="nav-item">💱 Rates</button>
+        <button class="nav-item">🌍 Analytics</button>
+        <button class="nav-item">📱 Social</button>
+        <button class="nav-item">⚙️ DevOps</button>
+
+        <div class="sidebar-footer">
+            <button id="logout-btn">← Sign Out</button>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <!-- Status Bar -->
+        <div class="status-bar">
+            <div class="status-item">
+                <div class="status-dot" id="api-status-dot"></div>
+                <span id="api-status-text">Checking…</span>
+            </div>
+            <div class="status-item">
+                <div class="status-dot" id="db-status-dot"></div>
+                <span id="db-status-text">Checking…</span>
+            </div>
+            <div class="status-item" style="margin-left:auto; color: var(--text-muted);">
+                Sync: <strong id="sync-timestamp-text" style="color:var(--text-primary);margin-left:4px">—</strong>
+            </div>
+            <div class="status-item" style="color: var(--text-muted);">
+                Latency: <strong id="response-time-text" style="color:var(--text-primary);margin-left:4px">—</strong>
+            </div>
+            <div style="margin-left:8px; display:flex; gap:8px;">
+                <button class="btn" id="sync-btn">🔄 Sync</button>
+                <button class="btn" id="snapshot-btn">📸 Snapshot</button>
+                <button class="btn" id="cleanup-btn">🧹 Cleanup</button>
+            </div>
+        </div>
+
+        <!-- Stats -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-label">Countries Tracked</div>
+                <div class="stat-value" id="stat-countries">—</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Total Users</div>
+                <div class="stat-value" id="stat-users">—</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Conversions (7d)</div>
+                <div class="stat-value" id="stat-conversions">—</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Snapshot</div>
+                <div class="stat-value" style="font-size:1rem;padding-top:4px" id="stat-snapshot">—</div>
+                <div style="font-size:0.7rem;color:var(--text-muted);margin-top:4px" id="stat-cleanup">—</div>
+            </div>
+        </div>
+
+        <div class="two-col">
+            <!-- Rate Table -->
+            <div class="panel">
+                <div class="panel-header">
+                    <div class="panel-title">💱 Live Exchange Rates</div>
+                    <span id="rate-source-val" style="font-size:0.75rem;color:var(--text-muted)">—</span>
+                </div>
+                <table class="rate-table">
+                    <thead>
+                        <tr>
+                            <th>Country</th>
+                            <th>Currency</th>
+                            <th>Rate → PHP</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="rate-table-body">
+                        <tr><td colspan="4" style="color:var(--text-muted);text-align:center;padding:20px">Loading…</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Analytics -->
+            <div>
+                <!-- Country Chart -->
+                <div class="panel" style="margin-bottom:14px">
+                    <div class="panel-title" style="margin-bottom:14px">🌍 Users by Country</div>
+                    <div id="country-chart-body"></div>
+                </div>
+
+                <!-- Conversion Rates -->
+                <div class="panel">
+                    <div class="panel-title" style="margin-bottom:14px">📈 Conversion Rates by Country</div>
+                    <div id="conversion-rates-body"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Trend Chart -->
+        <div class="panel">
+            <div class="panel-header">
+                <div class="panel-title">📉 Currency Trends</div>
+                <div id="trend-live-badge"></div>
+            </div>
+            <div style="margin-bottom:10px">
+                <select id="currency-filter" class="btn" style="font-size:0.8rem;cursor:pointer"></select>
+            </div>
+            <canvas id="trend-chart" height="80"></canvas>
+            <div id="trend-tooltip">
+                <div id="tooltip-date" style="color:var(--text-muted);margin-bottom:4px"></div>
+                <div id="tooltip-value" style="font-weight:700"></div>
+                <div id="tooltip-change"></div>
+            </div>
+        </div>
+
+        <div class="two-col">
+            <!-- Social Analytics -->
+            <div class="panel">
+                <div class="panel-header">
+                    <div class="panel-title">📱 Social Traffic <span id="social-nav-badge" class="pill pill-danger" style="display:none">!</span></div>
+                    <span id="social-status-text" style="font-size:0.8rem;color:var(--text-muted)">—</span>
+                </div>
+                <div id="social-platform-cards" style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:12px"></div>
+                <div id="social-bar-chart"></div>
+                <button class="btn" id="heal-social-btn" style="margin-top:12px;width:100%">🔧 Heal Now</button>
+            </div>
+
+            <!-- DevOps -->
+            <div class="panel">
+                <div class="panel-header">
+                    <div class="panel-title">⚙️ DevOps Engine</div>
+                    <span class="devops-verdict" id="devops-verdict">—</span>
+                </div>
+                <div style="display:flex;gap:16px;margin-bottom:12px">
+                    <div>
+                        <div style="font-size:0.7rem;color:var(--text-muted);margin-bottom:2px">Avg Latency</div>
+                        <div style="font-weight:700" id="metrics-latency">—</div>
+                    </div>
+                    <div>
+                        <div style="font-size:0.7rem;color:var(--text-muted);margin-bottom:2px">API Budget</div>
+                        <div style="font-weight:700" id="metrics-budget">—</div>
+                    </div>
+                </div>
+                <div id="devops-alerts" style="margin-bottom:12px"></div>
+                <div id="audit-history"></div>
+            </div>
+        </div>
+
+        <!-- Activity Log -->
+        <div class="panel">
+            <div class="panel-title" style="margin-bottom:10px">🗂 Activity Log</div>
+            <div id="log-body"></div>
+        </div>
+    </main>
+</div>
+
+<script>
+    // ── Bootstrap: extract token from URL ?t= param if present ──
+    (function() {
+        const params = new URLSearchParams(window.location.search);
+        const urlToken = params.get('t');
+        if (urlToken) {
+            sessionStorage.setItem('ofw_admin_token', urlToken);
+        }
+    })();
+</script>
+<script src="/admin.js"></script>
+
+</body>
+</html>

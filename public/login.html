@@ -377,9 +377,9 @@
 
                 if (res.ok) {
                     // Store token and redirect
-                    sessionStorage.setItem('admin_token', token);
+                    sessionStorage.setItem('ofw_admin_token', token);
                     btnLabel.textContent = 'Redirecting...';
-                    window.location.href = '/admin.html?token=' + encodeURIComponent(token);
+                    window.location.href = '/admin.html?t=' + encodeURIComponent(token);
                 } else {
                     throw new Error('Invalid');
                 }
