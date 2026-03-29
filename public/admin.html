@@ -419,12 +419,16 @@
 </div>
 
 <script>
-    // ── Bootstrap: extract token from URL ?t= param if present ──
+    // ── CRITICAL BOOTSTRAP: Run before admin.js ──
+    // Extract ?t= token from URL and save to sessionStorage immediately
     (function() {
         const params = new URLSearchParams(window.location.search);
         const urlToken = params.get('t');
         if (urlToken) {
-            sessionStorage.setItem('ofw_admin_token', urlToken);
+            sessionStorage.setItem('ofw_admin_token', urlToken.trim());
+            // Clean URL without reload
+            const cleanUrl = window.location.pathname;
+            window.history.replaceState({}, '', cleanUrl);
         }
     })();
 </script>
