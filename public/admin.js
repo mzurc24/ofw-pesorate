@@ -33,6 +33,7 @@
     const cleanupBtn   = $('cleanup-btn');
     const syncBtn      = $('sync-btn');
     const snapshotBtn  = $('snapshot-btn');
+    const healSocialBtn = $('heal-social-btn');
 
     // Charts / Analytics
     const countryChartBody     = $('country-chart-body');
@@ -66,38 +67,42 @@
     // AUTH (PRESERVED EXACTLY)
     // ══════════════════════════════════════════════════════════════════════
     if (adminToken) {
-        authOverlay.classList.add('hidden');
+        if (authOverlay) authOverlay.classList.add('hidden');
         initDashboard();
     }
 
-    loginBtn.addEventListener('click', async () => {
-        const token = tokenInput.value.trim();
-        if (!token) return;
+    if (loginBtn && tokenInput && authError && authOverlay) {
+        loginBtn.addEventListener('click', async () => {
+            const token = tokenInput.value.trim();
+            if (!token) return;
 
-        loginBtn.disabled = true;
-        loginBtn.textContent = 'Verifying…';
-        authError.classList.add('hidden');
+            loginBtn.disabled = true;
+            loginBtn.textContent = 'Verifying…';
+            authError.classList.add('hidden');
 
-        const success = await verifyToken(token);
-        if (success) {
-            adminToken = token;
-            sessionStorage.setItem('ofw_admin_token', token);
-            authOverlay.classList.add('hidden');
-            initDashboard();
-        } else {
-            authError.classList.remove('hidden');
-            loginBtn.disabled = false;
-            loginBtn.textContent = 'Secure Login';
-        }
-    });
+            const success = await verifyToken(token);
+            if (success) {
+                adminToken = token;
+                sessionStorage.setItem('ofw_admin_token', token);
+                authOverlay.classList.add('hidden');
+                initDashboard();
+            } else {
+                authError.classList.remove('hidden');
+                loginBtn.disabled = false;
+                loginBtn.textContent = 'Secure Login';
+            }
+        });
 
-    tokenInput.addEventListener('keypress', e => { if (e.key === 'Enter') loginBtn.click(); });
+        tokenInput.addEventListener('keypress', e => { if (e.key === 'Enter') loginBtn.click(); });
+    }
 
-    logoutBtn.addEventListener('click', () => {
-        sessionStorage.removeItem('ofw_admin_token');
-        if (refreshInterval) clearInterval(refreshInterval);
-        location.reload();
-    });
+    if (logoutBtn) {
+        logoutBtn.addEventListener('click', () => {
+            sessionStorage.removeItem('ofw_admin_token');
+            if (refreshInterval) clearInterval(refreshInterval);
+            location.reload();
+        });
+    }
 
     async function verifyToken(token) {
         try {
@@ -106,6 +111,40 @@
             });
             return res.ok;
         } catch (e) { return false; }
+    }
+
+    // ══════════════════════════════════════════════════════════════════════
+    // BUTTON HANDLERS
+    // ══════════════════════════════════════════════════════════════════════
+    if (healSocialBtn) {
+        healSocialBtn.addEventListener('click', async () => {
+            if (!confirm('This will manually trigger a Cloudflare CDN purge and reset the social failure state. Proceed?')) return;
+            
+            healSocialBtn.disabled = true;
+            healSocialBtn.textContent = 'Healing...';
+            
+            try {
+                const res = await fetch('/api/admin/heal-social', {
+                    method: 'POST',
+                    headers: authHeaders()
+                });
+                const data = await res.json();
+                
+                if (data.status === 'success') {
+                    addLog('success', 'Manual healing successful: CDN purge triggered.');
+                    alert('✨ System successfully healed! The CDN cache has been purged.');
+                } else {
+                    addLog('error', `Healing failed: ${data.message || 'Unknown error'}`);
+                    alert(`❌ Healing failed: ${data.message || 'Check logs'}`);
+                }
+            } catch (e) {
+                addLog('error', `Healing error: ${e.message}`);
+            } finally {
+                healSocialBtn.disabled = false;
+                healSocialBtn.textContent = '🔧 Heal Now';
+                refreshAll();
+            }
+        });
     }
 
     // ══════════════════════════════════════════════════════════════════════
@@ -178,8 +217,10 @@
             return cached.data;
         }
 
+        // If it was a critical fetch (system or metrics), return an empty object rather than null
+        // so that the UI can at least render with empty states instead of hanging.
         addLog('error', `Failed after ${retries} retries: ${url}`);
-        return null;
+        return { _failed: true };
     }
 
     function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
@@ -192,27 +233,47 @@
     // DASHBOARD INIT & REFRESH
     // ══════════════════════════════════════════════════════════════════════
     function initDashboard() {
-        addLog('info', 'Dashboard initialized');
+        addLog('info', 'Dashboard initialized — real-time sync active');
         refreshAll();
-        refreshInterval = setInterval(refreshAll, 30000);
+        refreshInterval = setInterval(refreshAll, 60000);
+        // Auto-trigger a silent snapshot on boot to seed the trend chart
+        silentAutoSnapshot();
+    }
+
+    async function silentAutoSnapshot() {
+        try {
+            await fetch('/api/admin/snapshot', {
+                method: 'POST',
+                headers: authHeaders()
+            });
+            addLog('info', 'Auto-snapshot seeded for real-time trend chart');
+        } catch (_) { /* non-fatal */ }
     }
 
     async function refreshAll() {
         try {
+            // Separate Social Init (Decoupled from blocking chain)
+            fetchSocialData();
+
             const [systemData, metricsData] = await Promise.all([
                 fetchWithRetry('/api/admin/system', { headers: authHeaders() }),
                 fetchWithRetry('/api/admin/metrics', { headers: authHeaders() })
             ]);
 
-            if (systemData) {
+            if (systemData && !systemData._failed) {
                 cachedSystemData = systemData;
                 renderSystemData(systemData);
             }
 
-            if (metricsData) {
+            if (metricsData && !metricsData._failed) {
                 cachedMetricsData = metricsData;
                 renderMetrics(metricsData);
             }
+
+            // Signal initialization success to watchdog
+            window.dashboardInitialized = true;
+            const overlay = $('loading-watchdog-overlay');
+            if (overlay) overlay.classList.add('hidden');
 
             addLog('success', 'Dashboard refreshed successfully');
         } catch (e) {
@@ -337,6 +398,102 @@
     // ══════════════════════════════════════════════════════════════════════
     // RENDER: Metrics (Conversion rates, currency trends)
     // ══════════════════════════════════════════════════════════════════════
+    // RENDER: Metrics (Conversion rates, currency trends, social traffic)
+    // ══════════════════════════════════════════════════════════════════════
+    async function fetchSocialData(retry = 0) {
+        const socialStatusText = $('social-status-text');
+        const cardsEl = $('social-platform-cards');
+        const barChartEl = $('social-bar-chart');
+
+        const fallbackData = {
+            status: 'DEGRADED',
+            platforms: [
+                { name: 'Facebook', clicks: 0 },
+                { name: 'WhatsApp', clicks: 0 },
+                { name: 'Telegram', clicks: 0 }
+            ]
+        };
+
+        try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 3000); // Strict 3s timeout (STEP 1)
+
+            const res = await fetch('/api/social', { 
+                signal: controller.signal,
+                headers: authHeaders()
+            });
+            clearTimeout(timeoutId);
+
+            if (!res.ok) throw new Error('API_DOWN');
+            const data = await res.json();
+            
+            if (!data || !data.platforms) throw new Error('INVALID_JSON');
+
+            renderSocialAnalytics(data, data.status === 'DEGRADED');
+
+        } catch (e) {
+            console.warn(`🛠️ [HEALING] Social API failed (Retry ${retry}/2): ${e.message}`);
+            
+            if (retry < 2) {
+                await sleep(500); // Cooling before retry
+                return fetchSocialData(retry + 1);
+            }
+
+            console.error('🛠️ [RECOVERY] Social Module entering SAFE MODE / DEGRADED.');
+            renderSocialAnalytics(fallbackData, true);
+        }
+    }
+
+    function renderSocialAnalytics(data, isDegraded) {
+        const platforms = data.platforms || [];
+        const totalVisits = platforms.reduce((a, p) => a + (p.clicks || 0), 0);
+        
+        const socialStatusText = $('social-status-text');
+        if (socialStatusText) {
+            socialStatusText.innerHTML = isDegraded 
+                ? `<span style="color:var(--warning)">⚠️ DEGRADED (${totalVisits})</span>` 
+                : `<span style="color:var(--success)">●</span> ${totalVisits} visits`;
+        }
+
+        const cardsEl = $('social-platform-cards');
+        if (cardsEl) {
+            if (!platforms.length) {
+                cardsEl.innerHTML = '<p style="color:var(--text-muted);text-align:center;padding:20px;grid-column:1/-1">No analytics data</p>';
+            } else {
+                const maxClicks = Math.max(...platforms.map(p => p.clicks || 0), 1);
+                cardsEl.innerHTML = platforms.map(p => {
+                    const meta = SOCIAL_META[p.name] || SOCIAL_META.Unknown;
+                    const barPct = Math.max(((p.clicks || 0) / maxClicks) * 100, 4);
+                    return `<div style="background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:14px;padding:18px;position:relative;overflow:hidden;transition:border-color 0.2s">
+                        <div style="position:absolute;top:0;left:0;right:0;height:3px;background:${meta.grad}"></div>
+                        <div style="font-size:1.8rem;margin-bottom:8px">${meta.icon}</div>
+                        <div style="font-weight:700;font-size:0.95rem;margin-bottom:4px">${p.name}</div>
+                        <div style="font-size:1.5rem;font-weight:800;letter-spacing:-0.5px;color:var(--text-primary)">${p.clicks || 0}</div>
+                        <div style="height:4px;background:rgba(255,255,255,0.05);border-radius:2px;margin-top:10px">
+                            <div style="height:100%;width:${barPct}%;background:${meta.grad};border-radius:2px"></div>
+                        </div>
+                    </div>`;
+                }).join('');
+            }
+        }
+
+        const barChartEl = $('social-bar-chart');
+        if (barChartEl && platforms.length) {
+            const maxClicks = Math.max(...platforms.map(p => p.clicks || 0), 1);
+            barChartEl.innerHTML = platforms.map(p => {
+                const meta = SOCIAL_META[p.name] || SOCIAL_META.Unknown;
+                const pct = Math.max(((p.clicks || 0) / maxClicks) * 100, 2);
+                return `<div class="bar-row">
+                    <div class="bar-label">${meta.icon} ${p.name}</div>
+                    <div class="bar-track">
+                        <div class="bar-fill" style="width:${pct}%;background:${meta.grad}"></div>
+                    </div>
+                    <div class="bar-value">${p.clicks || 0}</div>
+                </div>`;
+            }).join('');
+        }
+    }
+
     function renderMetrics(data) {
         // Conversion rates by country
         if (data.countryBreakdown?.length) {
@@ -345,21 +502,31 @@
             conversionRatesBody.innerHTML = '<p style="color:var(--text-muted); text-align:center; padding:40px">No conversion data yet</p>';
         }
 
-        // Currency trends (7-day chart)
+        // Social Media Traffic — DEPRECATED (Moved to fetchSocialData)
+        // We skip regular social traffic rendering here to avoid "Loading" hang
+
+        // Currency trends (real-time chart)
         if (data.currencyTrends?.length) {
             renderCurrencyFilter(data.currencyTrends);
             renderTrendChart(data.currencyTrends);
+            // Update LIVE badge
+            const liveBadge = $('trend-live-badge');
+            if (liveBadge) {
+                const now = new Date();
+                liveBadge.innerHTML = `<span style="display:inline-flex;align-items:center;gap:5px;font-size:0.72rem;color:var(--success);background:var(--success-soft);border:1px solid rgba(34,197,94,0.15);padding:3px 8px;border-radius:6px"><span style="width:6px;height:6px;border-radius:50%;background:var(--success);display:inline-block;animation:pulse-glow 2s infinite"></span>LIVE · ${now.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',hour12:true})}</span>`;
+            }
         } else {
             renderCurrencyFilter([]);
-            const ctx = trendCanvas.getContext('2d');
-            const rect = trendCanvas.parentElement.getBoundingClientRect();
-            trendCanvas.width = rect.width * 2;
-            trendCanvas.height = rect.height * 2;
-            ctx.scale(2, 2);
-            ctx.fillStyle = '#64748b';
-            ctx.font = '14px Inter, sans-serif';
-            ctx.textAlign = 'center';
-            ctx.fillText('No snapshot data yet — run a snapshot first', rect.width / 2, rect.height / 2);
+            if (trendCanvas) {
+                const ctx = trendCanvas.getContext('2d');
+                const rect = trendCanvas.parentElement.getBoundingClientRect();
+                trendCanvas.width = rect.width || 400;
+                trendCanvas.height = rect.height || 260;
+                ctx.fillStyle = '#64748b';
+                ctx.font = '13px Inter, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText('Seeding live data — refresh in a moment…', (rect.width || 400) / 2, (rect.height || 260) / 2);
+            }
         }
     }
 
@@ -380,6 +547,158 @@
             `;
             conversionRatesBody.appendChild(row);
         });
+    }
+
+    // ══════════════════════════════════════════════════════════════════════
+    // RENDER: Social Media Dashboard (Full Panel)
+    // ══════════════════════════════════════════════════════════════════════
+    const SOCIAL_META = {
+        Facebook:  { icon: '📘', color: '#1877f2', grad: 'linear-gradient(135deg,#1877f2,#4facfe)' },
+        Messenger: { icon: '💬', color: '#0084ff', grad: 'linear-gradient(135deg,#0084ff,#00c6ff)' },
+        Instagram: { icon: '📸', color: '#e1306c', grad: 'linear-gradient(135deg,#833ab4,#fd1d1d,#fcb045)' },
+        Twitter:   { icon: '🐦', color: '#1da1f2', grad: 'linear-gradient(135deg,#1da1f2,#0d7ab5)' },
+        LinkedIn:  { icon: '💼', color: '#0077b5', grad: 'linear-gradient(135deg,#0077b5,#00a0dc)' },
+        Unknown:   { icon: '📱', color: '#64748b', grad: 'linear-gradient(135deg,#374151,#64748b)' },
+    };
+
+    function renderSocialDashboard(socialData, healingLogs = []) {
+        const platforms = socialData.platforms || [];
+        const totalVisits = socialData.total_visits || 0;
+        const totalFailed = platforms.reduce((a, p) => a + (p.failed_count || 0), 0);
+
+        // — Status bar pill
+        const socialStatusText = $('social-status-text');
+        if (socialStatusText) {
+            socialStatusText.textContent = `${totalVisits} visits`;
+        }
+
+        // — Header badge
+        const totalBadge = $('social-total-badge');
+        const errorBadge = $('social-error-badge');
+        if (totalBadge) totalBadge.textContent = `${totalVisits} total visits (7d)`;
+        if (errorBadge) {
+            if (totalFailed > 0) {
+                errorBadge.textContent = `${totalFailed} failures`;
+                errorBadge.style.display = 'inline';
+            } else {
+                errorBadge.style.display = 'none';
+            }
+        }
+
+        // — Nav badge (alerts admin if there are failures)
+        const navBadge = $('social-nav-badge');
+        if (navBadge) navBadge.style.display = totalFailed > 0 ? 'inline' : 'none';
+
+        // — Platform Cards
+        const cardsEl = $('social-platform-cards');
+        if (cardsEl) {
+            if (!platforms.length) {
+                cardsEl.innerHTML = '<p style="color:var(--text-muted);text-align:center;padding:20px;grid-column:1/-1">No social traffic recorded yet</p>';
+            } else {
+                const maxCount = Math.max(...platforms.map(p => p.count));
+                cardsEl.innerHTML = platforms.map(p => {
+                    const meta = SOCIAL_META[p.platform] || SOCIAL_META.Unknown;
+                    const failedPct = p.count > 0 ? Math.round((p.failed_count / p.count) * 100) : 0;
+                    const successCount = p.count - (p.failed_count || 0);
+                    const barPct = Math.max((p.count / maxCount) * 100, 4);
+                    const errorClass = failedPct > 20 ? 'pill-danger' : failedPct > 5 ? 'pill-warning' : 'pill-success';
+                    const errorLabel = failedPct > 20 ? '⚠️ High' : failedPct > 5 ? '⚠ Med' : '✅ OK';
+
+                    return `<div style="background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:14px;padding:18px;position:relative;overflow:hidden;transition:border-color 0.2s">
+                        <div style="position:absolute;top:0;left:0;right:0;height:3px;background:${meta.grad}"></div>
+                        <div style="font-size:1.8rem;margin-bottom:8px">${meta.icon}</div>
+                        <div style="font-weight:700;font-size:0.95rem;margin-bottom:4px">${p.platform}</div>
+                        <div style="font-size:1.5rem;font-weight:800;letter-spacing:-0.5px;color:var(--text-primary)">${p.count}</div>
+                        <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:10px">${successCount} ok &nbsp;•&nbsp; <span style="color:${failedPct>5?'#ef4444':'var(--text-muted)'}">${p.failed_count||0} failed</span></div>
+                        <div style="height:4px;background:rgba(255,255,255,0.05);border-radius:2px">
+                            <div style="height:100%;width:${barPct}%;background:${meta.grad};border-radius:2px"></div>
+                        </div>
+                        <div style="margin-top:8px"><span class="pill ${errorClass}" style="font-size:0.65rem">${errorLabel} ${failedPct}% err</span></div>
+                    </div>`;
+                }).join('');
+            }
+        }
+
+        // — Bar Chart
+        const barChartEl = $('social-bar-chart');
+        if (barChartEl && platforms.length) {
+            const maxCount = Math.max(...platforms.map(p => p.count));
+            barChartEl.innerHTML = platforms.map(p => {
+                const meta = SOCIAL_META[p.platform] || SOCIAL_META.Unknown;
+                const pct = Math.max((p.count / maxCount) * 100, 2);
+                const failedPct = p.count > 0 ? ((p.failed_count || 0) / p.count) * 100 : 0;
+                const failedPx = (failedPct / 100) * pct;
+                return `<div class="bar-row">
+                    <div class="bar-label">${meta.icon} ${p.platform}</div>
+                    <div class="bar-track">
+                        <div class="bar-fill" style="width:${pct}%;background:${meta.grad}"></div>
+                        ${p.failed_count > 0 ? `<div class="bar-fill" style="width:${Math.min(failedPx,pct)}%;background:rgba(239,68,68,0.7);position:absolute;right:${100-pct}%;top:0;height:100%"></div>` : ''}
+                    </div>
+                    <div class="bar-value" style="width:auto;display:flex;gap:8px">
+                        ${p.count}
+                        ${p.failed_count > 0 ? `<span style="color:#ef4444;font-size:0.75rem">(${p.failed_count} err)</span>` : ''}
+                    </div>
+                </div>`;
+            }).join('');
+        } else if (barChartEl) {
+            barChartEl.innerHTML = '';
+        }
+
+        // — Failed Loads Panel
+        const failuresPanel = $('social-failures-panel');
+        const failureCount  = $('social-failure-count');
+        const failureBody   = $('social-failure-body');
+
+        if (failuresPanel) {
+            if (totalFailed > 0) {
+                failuresPanel.classList.remove('hidden');
+                if (failureCount) failureCount.textContent = totalFailed;
+
+                if (failureBody) {
+                    const failingPlatforms = platforms.filter(p => (p.failed_count || 0) > 0);
+                    failureBody.innerHTML = failingPlatforms.map(p => {
+                        const meta = SOCIAL_META[p.platform] || SOCIAL_META.Unknown;
+                        const rate = p.count > 0 ? Math.round((p.failed_count / p.count) * 100) : 0;
+                        const severity = rate > 20 ? '#ef4444' : rate > 5 ? '#f59e0b' : '#94a3b8';
+                        return `<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.05)">
+                            <span>${meta.icon} ${p.platform}</span>
+                            <span style="color:${severity};font-weight:600">${p.failed_count} failures &nbsp;(${rate}% error rate)</span>
+                        </div>`;
+                    }).join('');
+                }
+            } else {
+                failuresPanel.classList.add('hidden');
+            }
+        }
+
+        // — Healing Status Badge
+        const healingBadge = $('social-healing-badge');
+        if (healingBadge) {
+            const lastHealed = healingLogs.find(l => l.status === 'success');
+            if (lastHealed) {
+                healingBadge.style.display = 'inline';
+                healingBadge.title = `Last healed: ${formatTime(new Date(lastHealed.timestamp))}`;
+            } else {
+                healingBadge.style.display = 'none';
+            }
+        }
+
+        // — Healing History List
+        const logsList = $('healing-logs-list');
+        if (logsList) {
+            if (!healingLogs.length) {
+                logsList.innerHTML = '<div style="opacity:0.5;font-style:italic">No recent recovery events</div>';
+            } else {
+                logsList.innerHTML = healingLogs.slice(0, 5).map(l => {
+                    const statusColor = l.status === 'success' ? 'var(--success)' : 'var(--danger)';
+                    const time = formatTime(new Date(l.timestamp));
+                    return `<div style="display:flex;justify-content:space-between;gap:10px">
+                        <span><span style="color:${statusColor}">●</span> ${l.action} (${l.platform || 'Global'})</span>
+                        <span style="opacity:0.6">${time}</span>
+                    </div>`;
+                }).join('');
+            }
+        }
     }
 
     // ══════════════════════════════════════════════════════════════════════
@@ -630,7 +949,7 @@
     // ══════════════════════════════════════════════════════════════════════
     // ACTION BUTTONS
     // ══════════════════════════════════════════════════════════════════════
-    cleanupBtn.addEventListener('click', async () => {
+    if (cleanupBtn) cleanupBtn.addEventListener('click', async () => {
         if (!confirm('Run 7-day retention cleanup?\nAll data older than 7 days will be permanently deleted.')) return;
         cleanupBtn.disabled = true;
         cleanupBtn.textContent = '🗑 Purging…';
@@ -658,7 +977,7 @@
         }
     });
 
-    syncBtn.addEventListener('click', async () => {
+    if (syncBtn) syncBtn.addEventListener('click', async () => {
         if (!confirm('Force a fresh rate sync from Fixer API?')) return;
         syncBtn.disabled = true;
         syncBtn.textContent = '🔄 Syncing…';
@@ -686,7 +1005,7 @@
         }
     });
 
-    snapshotBtn.addEventListener('click', async () => {
+    if (snapshotBtn) snapshotBtn.addEventListener('click', async () => {
         if (!confirm('Capture a manual EOD snapshot for analytics?')) return;
         snapshotBtn.disabled = true;
         snapshotBtn.textContent = '📸 Saving…';
@@ -703,7 +1022,7 @@
                 refreshAll();
             } else {
                 showToast('error', 'Snapshot failed: ' + (data?.message || 'Unknown error'));
-                addLog('error', 'Snapshot failed: ' + (data?.message || 'Unknown'));
+                addLog('error', 'Snapshot exception: ' + e.message);
             }
         } catch (e) {
             showToast('error', 'Snapshot failed: ' + e.message);

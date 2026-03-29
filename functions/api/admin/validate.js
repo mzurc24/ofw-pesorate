@@ -14,10 +14,11 @@ export async function onRequest(context) {
     const url = new URL(request.url);
 
     // 1. Security Check
-    const rawToken = url.searchParams.get('token') || request.headers.get('Authorization')?.replace('Bearer ', '');
+    const authHeader = request.headers.get('Authorization') || '';
+    const token = authHeader.replace('Bearer ', '').trim();
     const validToken = (env.CF_ADMIN_TOKEN || 'ofwAk026').trim();
 
-    if (!rawToken || rawToken !== validToken) {
+    if (!token || token !== validToken) {
         return new Response(JSON.stringify({ status: 'error', message: 'Unauthorized' }), {
             status: 401,
             headers: { 'Content-Type': 'application/json' }
@@ -77,20 +78,23 @@ export async function onRequest(context) {
             }
         }
 
-        // 4. SELF-HEALING: If inconsistent or stale, trigger a force-sync
-        const isStale = cacheRecord ? (Date.now() - cacheRecord.updated_at) > 1000 * 60 * 60 * 6 : true; // 6h stale check for validation
-        
+        // 4. SELF-HEALING: Only trigger sync if cache is missing or truly stale (>24h).
+        // IMPORTANT: No force=true — sync.js internal throttle (6h) and quota guard (90 calls/month)
+        // are the single source of truth for rate-limiting. Never bypass them here.
+        const isStale = cacheRecord ? (Date.now() - cacheRecord.updated_at) > 1000 * 60 * 60 * 24 : true; // 24h stale threshold
+
         if (!results.consistent || isStale) {
-            console.warn('Consistency failure or stale cache detected. Triggering self-heal.');
-            
-            // Call sync endpoint internally (if token is valid)
+            console.warn('Validate: stale or inconsistent cache detected — requesting sync (quota-safe).');
+
+            // Use Bearer auth header — sync.js reads Authorization header, not query param
             const syncUrl = new URL('/api/admin/sync', url.origin);
-            syncUrl.searchParams.set('token', validToken);
-            syncUrl.searchParams.set('force', 'true');
-            
-            const syncRes = await fetch(syncUrl.toString());
+            const syncRes = await fetch(syncUrl.toString(), {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${validToken}` }
+                // NOTE: No force=true — the 6h throttle in sync.js will skip Fixer if recently synced
+            });
             const syncData = await syncRes.json();
-            
+
             results.self_healed = syncRes.ok;
             results.sync_result = syncData;
         }

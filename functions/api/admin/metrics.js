@@ -32,11 +32,10 @@ export async function onRequest(context) {
     rateLimitMap.set(ip, userLimit);
 
     // 2. Auth
-    const url = new URL(request.url);
-    const rawToken = url.searchParams.get('token') || request.headers.get('Authorization')?.replace('Bearer ', '');
-    const token = sanitizeString(rawToken);
+    const authHeader = request.headers.get('Authorization') || '';
+    const token = sanitizeString(authHeader.replace('Bearer ', ''));
 
-    if (token !== env.CF_ADMIN_TOKEN) {
+    if (!token || token !== env.CF_ADMIN_TOKEN) {
         return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -148,7 +147,7 @@ export async function onRequest(context) {
         }
     } catch (e) { console.error('Metrics: countryBreakdown query failed:', e.message); }
 
-    // 7-day currency trends from snapshots
+    // 7-day currency trends from snapshots (with live auto-seed fallback)
     try {
         const snapshots = await env.DB.prepare(`
             SELECT date, snapshot_json FROM currency_snapshots 
@@ -166,7 +165,91 @@ export async function onRequest(context) {
                 }
             });
         }
+
+        // Auto-seed today's snapshot from live rates_cache if not yet saved
+        const today = new Date().toISOString().split('T')[0];
+        const hasTodayEntry = currencyTrends.some(t => t.date === today);
+
+        if (!hasTodayEntry && env.DB) {
+            try {
+                const ratesRow = await env.DB.prepare(
+                    "SELECT rates_json FROM rates_cache WHERE base_currency = 'EUR'"
+                ).first();
+
+                if (ratesRow) {
+                    const { calculateRate } = await import('../rates.js');
+                    const allRates = JSON.parse(ratesRow.rates_json);
+
+                    const SNAPSHOT_CURRENCIES = [
+                        'SAR','AED','QAR','KWD','OMR','BHD','GBP','EUR','CHF',
+                        'NOK','SEK','SGD','HKD','MYR','TWD','JPY','KRW','CNY',
+                        'THB','USD','CAD','MXN','AUD','NZD'
+                    ];
+
+                    const liveSnapshot = SNAPSHOT_CURRENCIES.map(cur => ({
+                        pair: `${cur}_PHP`,
+                        rate: calculateRate(allRates, cur, 'PHP')
+                    }));
+
+                    // Push to trends array for this response
+                    currencyTrends.push({ date: today, snapshot: liveSnapshot, isLive: true });
+
+                    // Also silently persist to DB so subsequent calls are faster
+                    try {
+                        const snapId = crypto.randomUUID();
+                        const snapData = JSON.stringify({ date: today, snapshot: liveSnapshot, source: 'auto_live', timestamp: new Date().toISOString() });
+                        await env.DB.prepare(`
+                            INSERT INTO currency_snapshots (id, date, snapshot_json, source, timestamp)
+                            VALUES (?, ?, ?, 'auto_live', ?)
+                            ON CONFLICT(date) DO NOTHING
+                        `).bind(snapId, today, snapData, Date.now()).run();
+                    } catch (_) { /* non-fatal */ }
+                }
+            } catch (seedErr) {
+                console.warn('Metrics: live seed fallback failed (non-fatal):', seedErr.message);
+            }
+        }
     } catch (e) { console.error('Metrics: currencyTrends query failed:', e.message); }
+
+    let socialTrafficData = {
+        total_visits: 0,
+        platforms: []
+    };
+    try {
+        const socialResult = await env.DB.prepare(`
+            SELECT platform, 
+                   COUNT(*) as clicks,
+                   SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed_count
+            FROM social_traffic
+            WHERE timestamp >= ?
+            GROUP BY platform
+            ORDER BY clicks DESC
+        `).bind(sevenDaysAgo).all();
+
+        if (socialResult?.results) {
+            socialTrafficData.platforms = socialResult.results.map(p => ({
+                platform: p.platform,
+                name: p.platform, // Alias
+                clicks: p.clicks,
+                failed_count: p.failed_count
+            }));
+            socialTrafficData.total_visits = socialResult.results.reduce((acc, row) => acc + row.clicks, 0);
+        }
+    } catch (e) {
+        console.error('Metrics: socialAnalytics query failed:', e.message);
+    }
+
+    // Healing Logs (Last 10 events)
+    let healingLogs = [];
+    try {
+        const result = await env.DB.prepare(`
+            SELECT id, action, platform, status, details, timestamp 
+            FROM healing_logs 
+            ORDER BY timestamp DESC 
+            LIMIT 10
+        `).all();
+        healingLogs = result?.results || [];
+    } catch (e) { console.error('Metrics: healingLogs query failed:', e.message); }
 
     // 4. Return all data
     return Response.json({
@@ -177,10 +260,13 @@ export async function onRequest(context) {
         popularPairs,
         daily: dailyData,
         countryBreakdown,
-        currencyTrends
+        currencyTrends,
+        socialTraffic: socialTrafficData,
+        healingLogs
     }, {
         headers: {
-            'Cache-Control': 'public, max-age=60, s-maxage=60'
+            'Cache-Control': 'no-store, no-cache, must-revalidate',
+            'Content-Type': 'application/json'
         }
     });
 }
