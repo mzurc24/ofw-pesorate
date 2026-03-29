@@ -548,10 +548,28 @@ export async function onRequest(context) {
         @keyframes toast-in { from { opacity: 0; transform: translateX(40px); } to { opacity: 1; transform: translateX(0); } }
         @keyframes toast-out { from { opacity: 1; } to { opacity: 0; transform: translateX(40px); } }
 
-        .main::-webkit-scrollbar { width: 6px; }
-        .main::-webkit-scrollbar-track { background: transparent; }
-        .main::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 3px; }
         .main::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.15); }
+
+        /* Utility classes for DevOps Pulse Bar */
+        .flex { display: flex; }
+        .flex-1 { flex: 1; }
+        .flex-col { flex-direction: column; }
+        .items-center { align-items: center; }
+        .justify-between { justify-content: space-between; }
+        .gap-1 { gap: 0.25rem; }
+        .gap-2 { gap: 0.5rem; }
+        .gap-4 { gap: 1rem; }
+        .h-3 { height: 0.75rem; }
+        .rounded-sm { border-radius: 2px; }
+        .mb-2 { margin-bottom: 0.5rem; }
+        .mb-4 { margin-bottom: 1rem; }
+        .tracking-wider { letter-spacing: 0.05em; }
+        .uppercase { text-transform: uppercase; }
+        .font-mono { font-family: 'SF Mono', 'JetBrains Mono', monospace; }
+        .font-bold { font-weight: 700; }
+        .opacity-40 { opacity: 0.4; }
+        .text-white\/40 { color: rgba(255,255,255,0.4); }
+        .text-\[10px\] { font-size: 10px; }
     </style>
 </head>
 <body>
@@ -819,7 +837,7 @@ export async function onRequest(context) {
             sessionStorage.setItem('ofw_admin_token', injectedToken);
         }
     </script>
-    <script src="admin.js"></script>
+    <script src="admin.js?v=4.0.2"></script>
     <script>
 
         setTimeout(() => {
