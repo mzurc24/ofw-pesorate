@@ -1,0 +1,16 @@
+{
+  "name": "OFW PesoRate",
+  "short_name": "PesoRate",
+  "description": "Real-time exchange tracking for smarter remittances. Built for Global Filipinos.",
+  "start_url": "/?mode=pwa",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#0071e3",
+  "icons": [
+    {
+      "src": "/og-preview.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

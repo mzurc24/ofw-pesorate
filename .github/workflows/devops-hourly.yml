@@ -40,6 +40,10 @@ jobs:
           HTTP_CODE=$(echo "$RESPONSE" | tail -1)
           if [ "$HTTP_CODE" = "200" ]; then
             echo "✅ Sync successful or throttle active."
+            echo "🔔 Firing Notification Alert Engine..."
+            curl -s -X POST \
+              -H "Authorization: Bearer $CF_ADMIN_TOKEN" \
+              "https://ofwpesorate.madzlab.site/api/admin/alert"
           elif [ "$HTTP_CODE" = "429" ]; then
             echo "⚠️  Budget protection triggered. OK."
           else

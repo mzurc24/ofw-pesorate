@@ -1,10 +1,12 @@
 (() => {
     'use strict';
 
-    // ── Ghost Service Worker Exterminator & URL Cleanup ──────────────────────
+    // ── Progressive Web App (PWA) Initialization ─────────────────────────────
     if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.getRegistrations().then(registrations => {
-            for (let reg of registrations) reg.unregister();
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('/sw.js').catch(err => {
+                console.error('PWA Registration failed:', err);
+            });
         });
     }
     const url = new URL(window.location.href);
@@ -200,6 +202,9 @@
             window.appLoaded = true;
             clearTimeout(window.appBootTimeout);
 
+            // Fetch and draw the historical trend silently in the background
+            fetchAndDrawTrend(data.from_currency);
+
         } catch (error) {
             console.error('Failed to fetch rate:', error);
             rateValueEl.textContent = 'Err';
@@ -251,5 +256,80 @@
             }
         }
         requestAnimationFrame(update);
+    }
+
+    // ── Native High-Performance Sparkline Charting ───────────────────────────
+    async function fetchAndDrawTrend(baseCurrency) {
+        const canvas = document.getElementById('trend-chart');
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        
+        try {
+            const res = await fetch('/api/trends');
+            if (!res.ok) return;
+            const data = await res.json();
+            if (!data.trends || data.trends.length < 2) {
+                ctx.clearRect(0,0, canvas.width, canvas.height);
+                return;
+            }
+            
+            // Extract the rates for this specific currency pair over time
+            const points = data.trends.map(t => parseFloat(t.rates[baseCurrency] || 0)).filter(p => p > 0);
+            if (points.length < 2) return;
+
+            const min = Math.min(...points);
+            const max = Math.max(...points);
+            const padding = (max - min) * 0.1 || 0.0001; // 10% padding
+            const lowerBound = min - padding;
+            const upperBound = max + padding;
+
+            const width = canvas.width;
+            const height = canvas.height;
+            const stepX = width / (points.length - 1);
+
+            ctx.clearRect(0, 0, width, height);
+            ctx.beginPath();
+            
+            // Create a premium, soft glow layout
+            points.forEach((val, i) => {
+                const x = i * stepX;
+                const normalizedY = (val - lowerBound) / (upperBound - lowerBound);
+                // Invert Y so higher value is towards top of canvas
+                const y = height - (normalizedY * height);
+
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            });
+
+            // Trend indicator: Is the most recent day higher than the oldest day?
+            const isGoingUp = points[points.length - 1] > points[0]; 
+            const lineColor = isGoingUp ? '#34c759' : '#0071e3'; 
+            
+            ctx.strokeStyle = lineColor;
+            ctx.lineWidth = 3;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.stroke();
+
+            // Gradient Fill beneath the line simulating native iOS stocks UI
+            const fillPath = new Path2D();
+            points.forEach((val, i) => {
+                const x = i * stepX;
+                const normalizedY = (val - lowerBound) / (upperBound - lowerBound);
+                const y = height - (normalizedY * height);
+                if (i === 0) fillPath.moveTo(x, y);
+                else fillPath.lineTo(x, y);
+            });
+            fillPath.lineTo(width, height);
+            fillPath.lineTo(0, height);
+            fillPath.closePath();
+
+            const gradient = ctx.createLinearGradient(0, 0, 0, height);
+            gradient.addColorStop(0, lineColor + '44'); // 26% opacity
+            gradient.addColorStop(1, lineColor + '00'); // 0% opacity
+            ctx.fillStyle = gradient;
+            ctx.fill(fillPath);
+
+        } catch(e) { console.error('Silent fail for trend charts', e); }
     }
 })();
