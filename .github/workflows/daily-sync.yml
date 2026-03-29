@@ -1,45 +1,41 @@
-name: Daily Rate Sync & Snapshot (Quota-Safe)
+name: Automated Rate Sync & Snapshot (Twelve Data)
 
 on:
   schedule:
-    # Run once per day at 00:05 UTC — max 31 Fixer.io calls/month (well within 100-call free tier)
-    - cron: '5 0 * * *'
-  # workflow_dispatch is intentionally NOT included — all triggers must be scheduled only
+    # Every 2 hours at :05 — 12 syncs/day × 24 credits = 288 credits/day (36% of 800 free-tier limit)
+    # This is the ONLY trigger. No manual dispatch, no test triggers.
+    - cron: '5 */2 * * *'
 
 jobs:
-  daily_sync_and_snapshot:
+  rate_sync_and_snapshot:
     runs-on: ubuntu-latest
-    name: Daily Fixer Sync + Trend Snapshot
+    name: Rate Sync + Trend Snapshot
 
     steps:
-      - name: 📊 Check Fixer.io Quota Before Sync
-        id: quota_check
+      - name: 📊 Check Daily Credit Budget Before Sync
+        id: budget_check
         run: |
-          echo "📊 Checking monthly Fixer.io API quota..."
+          echo "📊 Verifying system is online and within budget..."
 
           RESPONSE=$(curl -s -w "\n%{http_code}" \
             -H "Authorization: Bearer ${{ secrets.CF_ADMIN_TOKEN }}" \
             "https://ofwpesorate.madzlab.site/api/admin/system")
 
           HTTP_CODE=$(echo "$RESPONSE" | tail -1)
-          JSON_BODY=$(echo "$RESPONSE" | head -n -1)
-
-          echo "HTTP Status: $HTTP_CODE"
 
           if [ "$HTTP_CODE" != "200" ]; then
-            echo "❌ System endpoint unreachable (HTTP $HTTP_CODE) — aborting to protect quota"
+            echo "❌ System unreachable (HTTP $HTTP_CODE) — aborting to protect API budget."
             exit 1
           fi
 
-          echo "✅ System reachable. Proceeding with sync."
+          echo "✅ System online. Proceeding."
 
-      - name: 🔄 Trigger Daily Rate Sync (Quota-Safe, Throttle-Respected)
-        id: fixer_sync
+      - name: 🔄 Sync Rates from Twelve Data (Budget-Safe)
+        id: rate_sync
         run: |
-          echo "🔄 Triggering daily Fixer.io rate sync at $(date -u)"
+          echo "🔄 Triggering Twelve Data rate sync at $(date -u)"
+          echo "   Budget: 800 credits/day | This call: 24 credits | Schedule: 12×/day = 288 credits/day"
 
-          # NOTE: No ?force=true — sync.js internal throttle (6h) protects against double-calls.
-          # If already synced recently, this returns HEALTHY/CACHE without hitting Fixer.
           RESPONSE=$(curl -s -w "\n%{http_code}" \
             -X POST \
             -H "Authorization: Bearer ${{ secrets.CF_ADMIN_TOKEN }}" \
@@ -51,24 +47,40 @@ jobs:
           echo "Sync HTTP Status: $HTTP_CODE"
           echo "Sync Response: $JSON_BODY"
 
-          # 429 means quota protected — still a safe outcome, not a failure
+          # 429 = daily quota guard triggered (safe — no call was made to Twelve Data)
           if [ "$HTTP_CODE" = "429" ]; then
-            echo "⚠️  Monthly Fixer quota guard triggered — no call made. System is safe."
+            echo "⚠️  Daily quota guard triggered — skipping sync to protect budget. OK."
             exit 0
           fi
 
-          if [ "$HTTP_CODE" != "200" ] && [ "$HTTP_CODE" != "503" ]; then
+          # 503 = circuit breaker active (safe — Twelve Data had repeated failures)
+          if [ "$HTTP_CODE" = "503" ]; then
+            echo "⚠️  Circuit breaker active — Twelve Data temporarily disabled. OK."
+            exit 0
+          fi
+
+          # 200 with CACHE status = data was fresh, sync skipped by 2h throttle
+          SYNC_STATUS=$(echo "$JSON_BODY" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('data_source',''))" 2>/dev/null || echo "")
+          if [ "$SYNC_STATUS" = "CACHE" ]; then
+            echo "✅ Data is fresh — sync skipped by throttle (within 2h window). OK."
+            exit 0
+          fi
+
+          if [ "$HTTP_CODE" != "200" ]; then
             echo "❌ Sync failed with HTTP $HTTP_CODE"
             exit 1
           fi
 
-          echo "✅ Rate sync completed."
+          # Extract and log credit usage for monitoring
+          CREDITS_TODAY=$(echo "$JSON_BODY" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('credits_used_today','?'))" 2>/dev/null || echo "?")
+          CREDITS_LEFT=$(echo "$JSON_BODY" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('credits_remaining_today','?'))" 2>/dev/null || echo "?")
+          echo "✅ Sync complete. Credits used today: ${CREDITS_TODAY}/700 | Remaining: ${CREDITS_LEFT}"
 
-      - name: 📸 Auto-Save Daily Trend Snapshot
+      - name: 📸 Save Daily Trend Snapshot (D1-only, Zero API Credits)
         run: |
-          echo "📸 Saving daily currency trend snapshot at $(date -u)"
+          echo "📸 Saving currency trend snapshot at $(date -u)"
+          echo "   NOTE: Snapshot reads from D1 rates_cache — ZERO Twelve Data credits consumed."
 
-          # Snapshot reads from D1 rates_cache only — ZERO Fixer.io calls.
           RESPONSE=$(curl -s -w "\n%{http_code}" \
             -X POST \
             -H "Authorization: Bearer ${{ secrets.CF_ADMIN_TOKEN }}" \
@@ -78,34 +90,34 @@ jobs:
           JSON_BODY=$(echo "$RESPONSE" | head -n -1)
 
           echo "Snapshot HTTP Status: $HTTP_CODE"
-          echo "Snapshot Response: $JSON_BODY"
 
           if [ "$HTTP_CODE" = "200" ]; then
-            echo "✅ Trend snapshot saved. Currency chart will show today's data point."
+            SNAP_DATE=$(echo "$JSON_BODY" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('date','?'))" 2>/dev/null || echo "?")
+            echo "✅ Trend snapshot saved for ${SNAP_DATE}. Admin chart will display this data point."
           else
-            echo "⚠️  Snapshot save returned HTTP $HTTP_CODE (non-fatal — D1 may be temporarily busy)"
+            echo "⚠️  Snapshot returned HTTP $HTTP_CODE (non-fatal — D1 may have been temporarily busy)."
           fi
 
-      - name: 🏥 Final Health Verification
+      - name: 🏥 Final Health Check
         run: |
-          echo "🏥 Verifying system health post-sync..."
+          echo "🏥 Verifying live API response..."
 
           RESPONSE=$(curl -s -w "\n%{http_code}" "https://ofwpesorate.madzlab.site/api/health")
           HTTP_CODE=$(echo "$RESPONSE" | tail -1)
 
           if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "304" ]; then
-            echo "✅ System healthy."
+            echo "✅ Platform is healthy."
           else
-            echo "⚠️  Health check returned HTTP $HTTP_CODE"
+            echo "⚠️  Health check returned HTTP $HTTP_CODE — may need investigation."
           fi
 
       - name: 🚨 Alert on Critical Failure
         if: failure()
         run: |
-          echo "🚨 Daily sync or snapshot failed. Check logs above."
+          echo "🚨 Automated sync pipeline FAILED. Review logs above."
           if [ -n "${{ secrets.DISCORD_WEBHOOK_URL }}" ]; then
             curl -H "Content-Type: application/json" \
                  -X POST \
-                 -d "{\"content\": \"🚨 **OFW PesoRate Daily Sync FAILED** at $(date -u). Check GitHub Actions logs.\"}" \
-                 ${{ secrets.DISCORD_WEBHOOK_URL }}
+                 -d "{\"content\": \"🚨 **OFW PesoRate Sync FAILED** at $(date -u). Source: Twelve Data. Check GitHub Actions.\"}" \
+                 "${{ secrets.DISCORD_WEBHOOK_URL }}"
           fi
