@@ -239,30 +239,49 @@ export async function onRequest(context) {
         console.error('Metrics: socialAnalytics query failed:', e.message);
     }
 
-    // Healing Logs (Last 10 events)
-    let healingLogs = [];
+    // DevOps & Reliability Trends (Hourly Checks)
+    let devopsTrend = [];
     try {
         const result = await env.DB.prepare(`
-            SELECT id, action, platform, status, details, timestamp 
-            FROM healing_logs 
-            ORDER BY timestamp DESC 
-            LIMIT 10
+            SELECT status, actions_taken, timestamp 
+            FROM devops_audit 
+            WHERE timestamp >= datetime('now', '-24 hours')
+            ORDER BY timestamp ASC
         `).all();
-        healingLogs = result?.results || [];
-    } catch (e) { console.error('Metrics: healingLogs query failed:', e.message); }
+        devopsTrend = result?.results || [];
+    } catch (e) {
+        console.error('Metrics: devopsTrend query failed:', e.message);
+    }
+
+    // Credit Usage Trend (30 days)
+    let usageTrend = [];
+    try {
+        const result = await env.DB.prepare(`
+            SELECT month as date, fixer_calls as credits_used
+            FROM api_usage
+            ORDER BY month DESC
+            LIMIT 30
+        `).all();
+        usageTrend = result?.results || [];
+    } catch (e) {
+        console.error('Metrics: usageTrend query failed:', e.message);
+    }
 
     // 4. Return all data
     return Response.json({
         metrics: {
             newUsers7d,
             conversions7d,
+            creditsUsedToday: usageTrend[0]?.credits_used || 0
         },
         popularPairs,
         daily: dailyData,
         countryBreakdown,
         currencyTrends,
         socialTraffic: socialTrafficData,
-        healingLogs
+        healingLogs,
+        devopsTrend,
+        usageTrend
     }, {
         headers: {
             'Cache-Control': 'no-store, no-cache, must-revalidate',

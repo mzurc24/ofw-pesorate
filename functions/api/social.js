@@ -36,7 +36,9 @@ export async function onRequest(context) {
 
         const platforms = result?.results || [];
         return Response.json({ 
-            status: platforms.length > 0 ? 'HEALTHY' : 'DEGRADED', 
+            // Only 'DEGRADED' if the env.DB was missing (handled above) or an actual query result failure occurred.
+            // Empty results mean zero traffic, which is a HEALTHY state for a new system.
+            status: 'HEALTHY', 
             platforms: platforms.map(p => ({ 
                 platform: p.platform, 
                 count: p.count, 

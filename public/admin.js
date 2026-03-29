@@ -272,6 +272,7 @@
             if (metricsData && !metricsData._failed) {
                 cachedMetricsData = metricsData;
                 renderMetrics(metricsData);
+                if (metricsData.usageTrend) renderUsageChart(metricsData.usageTrend);
             }
 
             // Signal initialization success to watchdog
@@ -455,14 +456,21 @@
         const socialStatusText = $('social-status-text');
         if (socialStatusText) {
             socialStatusText.innerHTML = isDegraded 
-                ? `<span style="color:var(--warning)">⚠️ DEGRADED (${totalVisits})</span>` 
-                : `<span style="color:var(--success)">●</span> ${totalVisits} visits`;
+                ? `<span style="color:var(--danger)">🔴 ERROR</span>` 
+                : platforms.length > 0 
+                    ? `<span style="color:var(--success)">●</span> ${totalVisits} visits`
+                    : `<span style="color:var(--text-muted)">⚪ No traffic yet</span>`;
         }
 
         const cardsEl = $('social-platform-cards');
         if (cardsEl) {
             if (!platforms.length) {
-                cardsEl.innerHTML = '<p style="color:var(--text-muted);text-align:center;padding:20px;grid-column:1/-1">No analytics data</p>';
+                cardsEl.innerHTML = `
+                    <div style="grid-column: 1/-1; text-align: center; padding: 40px; background: rgba(255,255,255,0.02); border: 1px dashed rgba(255,255,255,0.1); border-radius: 16px;">
+                        <p style="color: var(--text-muted); font-size: 0.9rem;">📡 Waiting for social media traffic...</p>
+                        <p style="color: var(--text-muted); font-size: 0.7rem; margin-top: 8px;">Analytics will appear here when users visit via Facebook, Instagram, etc.</p>
+                    </div>
+                `;
             } else {
                 const maxClicks = Math.max(...platforms.map(p => p.clicks || 0), 1);
                 cardsEl.innerHTML = platforms.map(p => {
@@ -560,9 +568,6 @@
             conversionRatesBody.innerHTML = '<p style="color:var(--text-muted); text-align:center; padding:40px">No conversion data yet</p>';
         }
 
-        // Social Media Traffic — DEPRECATED (Moved to fetchSocialData)
-        // We skip regular social traffic rendering here to avoid "Loading" hang
-
         // Currency trends (real-time chart)
         if (data.currencyTrends?.length) {
             renderCurrencyFilter(data.currencyTrends);
@@ -573,19 +578,62 @@
                 const now = new Date();
                 liveBadge.innerHTML = `<span style="display:inline-flex;align-items:center;gap:5px;font-size:0.72rem;color:var(--success);background:var(--success-soft);border:1px solid rgba(34,197,94,0.15);padding:3px 8px;border-radius:6px"><span style="width:6px;height:6px;border-radius:50%;background:var(--success);display:inline-block;animation:pulse-glow 2s infinite"></span>LIVE · ${now.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',hour12:true})}</span>`;
             }
-        } else {
-            renderCurrencyFilter([]);
-            if (trendCanvas) {
-                const ctx = trendCanvas.getContext('2d');
-                const rect = trendCanvas.parentElement.getBoundingClientRect();
-                trendCanvas.width = rect.width || 400;
-                trendCanvas.height = rect.height || 260;
-                ctx.fillStyle = '#64748b';
-                ctx.font = '13px Inter, sans-serif';
-                ctx.textAlign = 'center';
-                ctx.fillText('Seeding live data — refresh in a moment…', (rect.width || 400) / 2, (rect.height || 260) / 2);
-            }
         }
+
+        // DevOps Reliability Trend (Pulse Bar)
+        if (data.devopsTrend) {
+            renderDevOpsTrend(data.devopsTrend);
+        }
+        
+        // Usage Trend (Credit Budgeting)
+        if (data.usageTrend) {
+            renderUsageChart(data.usageTrend);
+        }
+    }
+
+    function renderDevOpsTrend(trend) {
+        const container = $('devops-alerts'); // We'll put the trend bar above alerts
+        if (!container) return;
+
+        // Create a 24-dot reliability bar
+        const statusColors = { HEALTHY: '#22c55e', DEGRADED: '#f59e0b', DOWN: '#ef4444' };
+        
+        let html = `<p class="text-[10px] text-white/40 uppercase font-bold tracking-wider mb-2">24h Reliability Sync Pulse</p>`;
+        html += `<div class="flex gap-1 mb-4">`;
+        
+        // If we have less than 24, pad with 'pending'
+        const fullTrend = [...trend];
+        while (fullTrend.length < 24) fullTrend.unshift({ status: 'PENDING' });
+
+        fullTrend.slice(-24).forEach(t => {
+            const color = statusColors[t.status] || 'rgba(255,255,255,0.05)';
+            html += `<div class="flex-1 h-3 rounded-sm border border-white/5" style="background:${color};" title="${t.timestamp || 'No data'}"></div>`;
+        });
+        
+        html += `</div>`;
+        
+        // Prepend to alerts container if not already there
+        const trendId = 'devops-reliability-bar';
+        let bar = $(trendId);
+        if (!bar) {
+            bar = document.createElement('div');
+            bar.id = trendId;
+            container.parentNode.insertBefore(bar, container);
+        }
+        bar.innerHTML = html;
+    }
+
+    function renderUsageChart(usage) {
+        const budgetEl = $('metrics-budget');
+        if (!budgetEl || !usage.length) return;
+
+        // Update the main budget stat with the latest day's usage
+        const latest = usage[0]; // limit 30 desc, so index 0 is latest
+        const limit = 700;
+        const used = latest.credits_used || 0;
+        const left = Math.max(limit - used, 0);
+
+        budgetEl.innerHTML = `${left} <span class="text-[10px] opacity-40">/ ${limit} left</span>`;
     }
 
     function renderConversionRates(breakdown) {
