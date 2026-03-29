@@ -3,28 +3,12 @@
  * Optimized single-rate lookup endpoint.
  * Strategy: D1 Cache → Hardcoded Fallback
  * Single Source of Math: Uses centralized normalization.
- * Version: 3.0.0 (Consistency Engine)
+ * Version: 4.0.0 (Twelve Data Engine)
+ *
+ * This version supports auto-detection via Cloudflare GeoIP and logs to DevOps.
  */
 
-import { calculateRate, EMERGENCY_RATES } from './rates.js';
-
-const COUNTRY_CURRENCY_MAP = {
-    'SA': 'SAR', 'AE': 'AED', 'QA': 'QAR', 'KW': 'KWD', 'OM': 'OMR',
-    'BH': 'BHD', 'GB': 'GBP', 'IT': 'EUR', 'ES': 'EUR', 'DE': 'EUR',
-    'FR': 'EUR', 'NL': 'EUR', 'CH': 'CHF', 'NO': 'NOK', 'SE': 'SEK',
-    'SG': 'SGD', 'HK': 'HKD', 'MY': 'MYR', 'TW': 'TWD', 'JP': 'JPY',
-    'KR': 'KRW', 'CN': 'CNY', 'TH': 'THB', 'US': 'USD', 'CA': 'CAD',
-    'MX': 'MXN', 'AU': 'AUD', 'NZ': 'NZD',
-    'PH': 'PHP'
-};
-
-const CURRENCY_SYMBOLS = {
-    'SAR': '﷼', 'AED': 'د.إ', 'QAR': '﷼', 'KWD': 'د.ك', 'OMR': '﷼',
-    'BHD': '.د.ب', 'GBP': '£', 'EUR': '€', 'CHF': 'CHF', 'NOK': 'kr',
-    'SEK': 'kr', 'SGD': '$', 'HKD': '$', 'MYR': 'RM', 'TWD': 'NT$',
-    'JPY': '¥', 'KRW': '₩', 'CNY': '¥', 'THB': '฿', 'USD': '$',
-    'CAD': '$', 'MXN': '$', 'AUD': '$', 'NZD': '$', 'PHP': '₱'
-};
+import { calculateRate, EMERGENCY_RATES, COUNTRY_CURRENCY_MAP, CURRENCY_SYMBOLS } from './rates.js';
 
 async function safeDbQuery(env, query, ...params) {
     if (!env || !env.DB) return null;
@@ -46,6 +30,7 @@ export async function onRequest(context) {
     const userId = (request.headers.get('x-user-id') || 'guest').substring(0, 50).replace(/[<>"'&]/g, "");
     const customCurrency = url.searchParams.get('currency');
     
+    // 1. Auto-Detect Country via Cloudflare GeoIP
     let country = (request.cf?.country || 'US').toUpperCase();
     
     // Testing & Simulation Environment (CI/CD)
@@ -56,13 +41,14 @@ export async function onRequest(context) {
         country = testCountry.toUpperCase();
     }
 
+    // 2. Resolve Base Currency
     let baseCurrency = COUNTRY_CURRENCY_MAP[country] || 'USD';
     if (customCurrency && CURRENCY_SYMBOLS[customCurrency]) {
         baseCurrency = customCurrency;
     }
     const targetCurrency = 'PHP';
 
-    // Social Media Detection & Self-Healing
+    // 3. Social Media Detection & Metadata
     const userAgent = request.headers.get('User-Agent') || '';
     const referer = request.headers.get('Referer') || '';
     
@@ -71,16 +57,13 @@ export async function onRequest(context) {
     let isSocialWebview = false;
     const uaLower = userAgent.toLowerCase();
     
-    // Bots
     if (uaLower.includes('facebookexternalhit') || uaLower.includes('facebot')) {
         socialPlatform = 'Facebook'; isSocialBot = true;
     } else if (uaLower.includes('twitterbot')) {
         socialPlatform = 'Twitter'; isSocialBot = true;
     } else if (uaLower.includes('linkedinbot')) {
         socialPlatform = 'LinkedIn'; isSocialBot = true;
-    } 
-    // In-App Browsers
-    else if (uaLower.includes('fbav') || uaLower.includes('fban')) {
+    } else if (uaLower.includes('fbav') || uaLower.includes('fban')) {
         socialPlatform = 'Facebook'; isSocialWebview = true;
     } else if (uaLower.includes('instagram')) {
         socialPlatform = 'Instagram'; isSocialWebview = true;
@@ -96,8 +79,9 @@ export async function onRequest(context) {
     if (uaLower.includes('mobi')) deviceType = 'Mobile';
     else if (uaLower.includes('tablet')) deviceType = 'Tablet';
 
-    // Logging
+    // 4. Persistence & Telemetry
     if (env.DB) {
+        // Log user and conversion
         waitUntil(safeDbRun(env, `
             INSERT INTO users (id, name, country, first_seen) 
             VALUES (?, 'Guest', ?, ?)
@@ -109,15 +93,19 @@ export async function onRequest(context) {
             VALUES (?, ?, ?, ?, ?, ?)
         `, crypto.randomUUID(), userId, baseCurrency, targetCurrency, 1, nowStamp));
 
+        // Log social traffic if applicable
         if (socialPlatform) {
             waitUntil(safeDbRun(env, `
                 INSERT INTO social_traffic (id, platform, country, device_type, status, timestamp)
                 VALUES (?, ?, ?, ?, ?, ?)
             `, crypto.randomUUID(), socialPlatform, country, deviceType, 'success', nowStamp));
         }
+
+        // 🚨 DevOps Telemetry: Log endpoint hit (Zero Credit)
+        waitUntil(safeDbRun(env, `INSERT INTO api_logs (endpoint, status) VALUES (?, ?)`, '/api/rate', 'hit_auto_detect'));
     }
 
-    // Data Retrieval Strategy
+    // 5. Rate Retrieval (D1 Cache → Twelve Data Source)
     let rates = null;
     let strategyUsed = 'fallback';
 
@@ -134,7 +122,7 @@ export async function onRequest(context) {
         rates = EMERGENCY_RATES;
     }
 
-    // Single Source of Math
+    // 6. Final Calculation (Single Source of Math)
     const finalRate = calculateRate(rates, baseCurrency, targetCurrency);
 
     return new Response(JSON.stringify({
@@ -144,18 +132,20 @@ export async function onRequest(context) {
         country: country,
         symbol: CURRENCY_SYMBOLS[baseCurrency] || '',
         target_symbol: '₱',
-        currency_locked: country !== 'PH',
+        currency_locked: country !== 'PH', // If in PH, user can change anything
         social_mode: isSocialWebview || isSocialBot,
         is_bot: isSocialBot,
         _meta: {
             strategy: strategyUsed,
+            provider: 'twelve_data',
             updated: nowStamp,
             consistency_verified: true
         }
     }), {
         headers: {
             'Content-Type': 'application/json',
-            'Cache-Control': 'no-store, no-cache, must-revalidate'
+            'Cache-Control': 'no-store, no-cache, must-revalidate',
+            'Access-Control-Allow-Origin': '*'
         }
     });
 }

@@ -12,7 +12,7 @@ const CACHE_TTL = 7200; // 2 hours in seconds — nearly-live data feed
 
 // All currency pairs fetched as EUR/{currency} — maintains the EUR-base format
 // that calculateRate() requires. 1 batch HTTP call = 24 credits.
-const TWELVE_SYMBOLS = [
+export const TWELVE_SYMBOLS = [
   'EUR/USD', 'EUR/PHP', 'EUR/SGD', 'EUR/JPY', 'EUR/GBP',
   'EUR/SAR', 'EUR/AED', 'EUR/QAR', 'EUR/KWD', 'EUR/OMR',
   'EUR/BHD', 'EUR/CAD', 'EUR/AUD', 'EUR/NZD', 'EUR/CHF',
@@ -20,7 +20,23 @@ const TWELVE_SYMBOLS = [
   'EUR/KRW', 'EUR/CNY', 'EUR/THB', 'EUR/MXN'
 ].join(',');
 
-// Emergency hardcoded fallback rates (EUR-based) — values updated to March 2026 approximates
+// Official Country to Currency Mapping (24 Regions Supported)
+export const COUNTRY_CURRENCY_MAP = {
+  'SA': 'SAR', 'AE': 'AED', 'QA': 'QAR', 'KW': 'KWD', 'OM': 'OMR', 'BH': 'BHD',
+  'GB': 'GBP', 'IT': 'EUR', 'ES': 'EUR', 'DE': 'EUR', 'FR': 'EUR', 'NL': 'EUR',
+  'CH': 'CHF', 'NO': 'NOK', 'SE': 'SEK', 'SG': 'SGD', 'HK': 'HKD', 'MY': 'MYR',
+  'TW': 'TWD', 'JP': 'JPY', 'KR': 'KRW', 'CN': 'CNY', 'TH': 'THB', 'US': 'USD',
+  'CA': 'CAD', 'MX': 'MXN', 'AU': 'AUD', 'NZ': 'NZD', 'PH': 'PHP'
+};
+
+// Global Currency Symbols for UI
+export const CURRENCY_SYMBOLS = {
+  'SAR': '﷼', 'AED': 'د.إ', 'QAR': '﷼', 'KWD': 'د.ك', 'OMR': '﷼', 'BHD': '.د.ب',
+  'GBP': '£', 'EUR': '€', 'CHF': 'CHF', 'NOK': 'kr', 'SEK': 'kr', 'SGD': '$',
+  'HKD': '$', 'MYR': 'RM', 'TWD': 'NT$', 'JPY': '¥', 'KRW': '₩', 'CNY': '¥',
+  'THB': '฿', 'USD': '$', 'CAD': '$', 'MXN': '$', 'AUD': '$', 'NZD': '$', 'PHP': '₱'
+};
+
 export const EMERGENCY_RATES = {
   USD: 1.08, PHP: 63.5, SGD: 1.45, JPY: 162.0, GBP: 0.855,
   SAR: 4.05, AED: 3.97, QAR: 3.93, KWD: 0.332, OMR: 0.416,
