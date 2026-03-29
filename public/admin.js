@@ -103,7 +103,7 @@
         logoutBtn.addEventListener('click', () => {
             sessionStorage.removeItem('ofw_admin_token');
             if (refreshInterval) clearInterval(refreshInterval);
-            location.reload();
+            location.href = '/';
         });
     }
 
