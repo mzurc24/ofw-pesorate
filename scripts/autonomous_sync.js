@@ -1,6 +1,6 @@
 /**
  * OFW Pesorate - Senior DevOps Autonomous Sync Agent
- * Implements the 6-step flow to maintain system health while minimizing Fixer.io costs.
+ * Implements the 6-step flow to maintain system health while maximizing Twelve Data efficiency.
  */
 
 const { execSync } = require('child_process');
@@ -44,8 +44,8 @@ async function main() {
         console.log(`⚠️ CACHE NEEDS REFRESH (Age: ${Math.round(ageSecs/3600)}h, Count: ${ratesCount})`);
     }
 
-    // STEP 3: Controlled Fixer Sync
-    const syncResult = await runStep("3: CONTROLLED FIXER SYNC", async () => {
+    // STEP 3: Controlled Twelve Data Sync
+    const syncResult = await runStep("3: CONTROLLED TWELVE DATA SYNC", async () => {
         const res = await fetch(SYNC_URL);
         const data = await res.json();
         console.log(`[AGENT] Sync Response: ${data.status} - ${data.message}`);
