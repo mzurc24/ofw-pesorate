@@ -40,9 +40,12 @@ export async function onRequest(context) {
     if (!country || country === 'XX' || country === 'T1') {
         const clientCountry = request.headers.get('x-client-country');
         const browserLocale = request.headers.get('x-browser-locale');
+        const timeZone = request.headers.get('x-time-zone');
         
         if (clientCountry && clientCountry.length === 2) {
             country = clientCountry.toUpperCase();
+        } else if (timeZone && timeZone === 'Asia/Manila') {
+            country = 'PH';
         } else if (browserLocale && browserLocale.includes('-')) {
             country = browserLocale.split('-')[1].toUpperCase();
         } else {

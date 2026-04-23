@@ -159,6 +159,7 @@
 
             const savedCountry = localStorage.getItem('ofw_pesorate_country') || sessionStorage.getItem('ofw_pesorate_country') || '';
             const browserLocale = navigator.language || navigator.userLanguage || '';
+            const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
 
             const res = await fetch(url, {
                 signal: controller.signal,
@@ -166,7 +167,8 @@
                     'x-user-id': id,
                     'x-user-name': encodeURIComponent(name || ''),
                     'x-client-country': savedCountry,
-                    'x-browser-locale': browserLocale
+                    'x-browser-locale': browserLocale,
+                    'x-time-zone': timeZone
                 }
             });
             clearTimeout(timeoutId);

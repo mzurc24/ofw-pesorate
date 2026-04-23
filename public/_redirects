@@ -1,4 +1,2 @@
-/admin /pesopanel.html 302
-/admin/ /pesopanel.html 302
-/panel /pesopanel.html 302
-/panel/ /pesopanel.html 302
+/panel /admin 302
+/panel/ /admin 302

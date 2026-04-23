@@ -62,6 +62,9 @@
     const metricsBudget   = $('metrics-budget');
     const devopsAlerts    = $('devops-alerts');
     const auditHistory    = $('audit-history');
+    
+    // Logs
+    const logPanel        = $('log-body');
 
     // ══════════════════════════════════════════════════════════════════════
     // STATE
@@ -416,7 +419,7 @@
     // ══════════════════════════════════════════════════════════════════════
     // RENDER: Metrics (Conversion rates, currency trends, social traffic)
     // ══════════════════════════════════════════════════════════════════════
-    async function fetchSocialData(retry = 0) {
+    async function fetchSocialData() {
         const socialStatusText = $('social-status-text');
         const cardsEl = $('social-platform-cards');
         const barChartEl = $('social-bar-chart');
@@ -448,14 +451,8 @@
             renderSocialAnalytics(data, data.status === 'DEGRADED');
 
         } catch (e) {
-            console.warn(`🛠️ [HEALING] Social API failed (Retry ${retry}/2): ${e.message}`);
-            
-            if (retry < 2) {
-                await sleep(500); // Cooling before retry
-                return fetchSocialData(retry + 1);
-            }
-
-            console.error('🛠️ [RECOVERY] Social Module entering SAFE MODE / DEGRADED.');
+            console.warn(`🛠️ Social API failed: ${e.message}`);
+            console.error('🛠️ Social Module entering SAFE MODE / DEGRADED.');
             renderSocialAnalytics(fallbackData, true);
         }
     }
@@ -1164,6 +1161,7 @@
     }
 
     function renderLogs() {
+        if (!logPanel) return;
         logPanel.innerHTML = logEntries.map(entry => `
             <div class="log-entry">
                 <span class="log-level ${entry.level}">${entry.level.toUpperCase()}</span>
@@ -1171,8 +1169,6 @@
                 <span class="log-msg">${entry.message}</span>
             </div>
         `).join('');
-
-        logCount.textContent = `${logEntries.length} events`;
     }
 
     // ══════════════════════════════════════════════════════════════════════
@@ -1217,5 +1213,3 @@
     };
 
 })();
-/ /   D e p l o y m e n t   P u s h :   2 0 2 6 - 0 3 - 2 9 - 1 5 2 1  
- 
