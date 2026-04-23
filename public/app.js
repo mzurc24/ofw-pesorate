@@ -63,95 +63,24 @@
     let userName         = localStorage.getItem('ofw_pesorate_name');
     let userId           = localStorage.getItem('ofw_pesorate_id');
     let currentCurrency  = localStorage.getItem('ofw_pesorate_base') || null;
-    let lastFetchTime    = 0;
-    let rateCache        = null;
 
     if (!userId) {
         userId = generateUUID();
         localStorage.setItem('ofw_pesorate_id', userId);
     }
 
-    /**
-     * ── RateTicker Engine (v2.0) ─────────────────────────────────────────────
-     * Simulates "Live" rate fluctuations using server-provided deltas.
-     * Implements SMA smoothing and interpolation between updates.
-     */
-    class RateTicker {
-        constructor() {
-            this.baseRate = 0;
-            this.displayRate = 0;
-            this.delta = 0;
-            this.smaBuffer = [];
-            this.timer = null;
-            this.initialized = false;
-        }
-
-        update(serverRate, prevRate) {
-            // ALWAYS jump to the correct rate — prevents wrong display when switching currencies
-            this.baseRate = serverRate;
-            this.displayRate = serverRate;
-            this.smaBuffer = [serverRate]; // Reset smoothing buffer too
-            this.delta = (serverRate - prevRate) / 60; // Spread delta over 60 seconds
-            this.initialized = true;
-            this.render(); // Immediately show correct rate, no waiting for next tick
-            this.start();
-        }
-
-        start() {
-            if (this.timer) clearInterval(this.timer);
-            this.timer = setInterval(() => this.tick(), 1000);
-        }
-
-        tick() {
-            // A. Linear Interpolation + Random Market Jitter (±0.00015)
-            const jitter = (Math.random() - 0.5) * 0.0003;
-            let nextVal = this.displayRate + this.delta + jitter;
-
-            // B. SMA Smoothing (5-step window)
-            this.smaBuffer.push(nextVal);
-            if (this.smaBuffer.length > 5) this.smaBuffer.shift();
-            const smoothed = this.smaBuffer.reduce((a, b) => a + b, 0) / this.smaBuffer.length;
-
-            this.displayRate = smoothed;
-            this.render();
-        }
-
-        render() {
-            if (!rateValueEl) return;
-            // High-precision display for the "Live" feel
-            rateValueEl.textContent = this.displayRate.toLocaleString(undefined, {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 4
-            });
-
-            // Always do a live lookup — renderUI rebuilds secondary-rate via innerHTML each time
-            const liveSecondaryEl = document.getElementById('secondary-rate');
-            if (liveSecondaryEl && secondaryReference && !secondaryReference.classList.contains('hidden')) {
-                const usdRate = parseFloat(rateCache?.usd_rate || 60);
-                const isUSD = rateCache?.from_currency === 'USD';
-                if (isUSD) {
-                    liveSecondaryEl.textContent = this.displayRate.toFixed(2);
-                } else {
-                    liveSecondaryEl.textContent = (this.displayRate / usdRate).toFixed(2);
-                }
-            }
-        }
-    }
-
-    const ticker = new RateTicker();
-
-
     // ── Bootstrap ────────────────────────────────────────────────────────────
     // ── Bootstrap (Phase 1: Early Visibility) ────────────────────────────────
     try {
         if (!userName) {
             firstVisitDiv.classList.remove('hidden');
-            window.appLoaded = true;
+            window.appLoaded = true; // Tell watchdog the UI is ready and waiting for input
         } else {
             dashboardDiv.classList.remove('hidden');
             showDashboard(userName);
         }
 
+        // ── Phase 2: Fade out loader
         const loader = document.getElementById('app-boot-loading');
         if (loader) {
             loader.classList.add('fade-out');
@@ -159,6 +88,7 @@
         }
     } catch (e) {
         console.error('Bootstrap failure:', e);
+        // Ensure at least one UI element shows
         if (firstVisitDiv) firstVisitDiv.classList.remove('hidden');
     }
 
@@ -179,23 +109,14 @@
     async function showDashboard(name) {
         if (dashboardDiv) dashboardDiv.classList.remove('hidden');
         if (greetingEl) greetingEl.textContent = `Hello, ${name} 👋`;
-
-        // MASTER REFERENCE: Detect PH vs non-PH FIRST, then apply currency logic
-        // PH users: saved preference OR default USD
-        // Non-PH users: server will auto-detect and lock
-        const savedCountry = localStorage.getItem('ofw_pesorate_country') || '';
-        const isPH = savedCountry === 'PH';
-
-        let startCurrency = null;
-        if (isPH) {
-            // PH default = USD (per Master Reference)
-            const preferred = localStorage.getItem('ofw_pesorate_base');
-            startCurrency = (preferred && preferred !== 'PHP') ? preferred : 'USD';
-            if (baseCurrencySelect) baseCurrencySelect.value = startCurrency;
+        
+        // Sync Base Currency Selector with localStorage
+        const preferred = localStorage.getItem('ofw_pesorate_base');
+        if (preferred && baseCurrencySelect) {
+            baseCurrencySelect.value = preferred;
         }
-        // Non-PH: send no currency param — server locks to detected country
 
-        await fetchRate(name, userId, false, startCurrency);
+        await fetchRate(name, userId, false, preferred || currentCurrency);
     }
 
 
@@ -204,137 +125,164 @@
         currentCurrency = newCurrency;
         localStorage.setItem('ofw_pesorate_base', newCurrency);
         
+        // Asynchronously save to D1
         fetch('/api/user/preferences', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'x-user-id': userId },
             body: JSON.stringify({ preferred_currency: newCurrency })
         }).catch(() => {});
 
-        // Currency change forces a fresh fetch
         fetchRate(userName, userId, true, newCurrency);
     });
 
 
-
-
-
-    async function fetchRate(name, userId, isRefresh = false, currency = null) {
-        if (!dashboardDiv) return;
-        
-        const now = Date.now();
-        // Smart Cache: Only fetch if currency changed OR > 60s since last fetch
-        if (!isRefresh && !currency && rateCache && (now - lastFetchTime < 60000)) {
-            renderUI(rateCache);
-            return;
+    async function fetchRate(name, id, isRefresh = false, currency = null) {
+        if (isRefresh) {
+            rateValueEl.parentElement.style.opacity = '0.6';
         }
 
         try {
-            const browserLocale = navigator.language || 'en-US';
-            const savedCountry = localStorage.getItem('ofw_pesorate_country') || '';
-            const url = `/api/rate?user_id=${userId}${currency ? `&currency=${currency}` : ''}`;
+            const url = new URL('/api/rate', window.location.origin);
+            if (currency) url.searchParams.set('currency', currency);
             
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 3000); // 3s timeout for production stability
+
+            const savedCountry = localStorage.getItem('ofw_pesorate_country') || sessionStorage.getItem('ofw_pesorate_country') || '';
+            const browserLocale = navigator.language || navigator.userLanguage || '';
+
             const res = await fetch(url, {
+                signal: controller.signal,
                 headers: {
+                    'x-user-id': id,
                     'x-user-name': encodeURIComponent(name || ''),
                     'x-client-country': savedCountry,
                     'x-browser-locale': browserLocale
                 }
             });
+            clearTimeout(timeoutId);
             
             if (!res.ok) throw new Error('API Error');
             const data = await res.json();
 
-            if (data.status === 'HEALTHY' || data.status === 'DEGRADED') {
-                rateCache = data;
-                lastFetchTime = Date.now();
-
-                // Sync currentCurrency to what the API confirmed
-                // Critical for PH users: keeps Refresh and re-fetch consistent
-                if (data.from_currency) {
-                    currentCurrency = data.from_currency;
-                    if (data.is_ph && data.from_currency !== 'PHP') {
-                        localStorage.setItem('ofw_pesorate_base', data.from_currency);
-                    }
-                }
-
-                renderUI(data);
-                ticker.update(data.rate, data.previous_rate || data.rate);
-                fetchAndDrawTrend(data.from_currency);
+            // Production Stability: Handle Degraded state
+            const statusPill = document.querySelector('.status-pill');
+            const dot = document.querySelector('.dot');
+            const lastUpdated = document.getElementById('last-updated');
+            
+            // Persist securely detected country uniformly across session/local storage
+            if (data.country) {
+                localStorage.setItem('ofw_pesorate_country', data.country);
+                sessionStorage.setItem('ofw_pesorate_country', data.country);
             }
+            
+            if (data.status === 'DEGRADED') {
+                if (dot) {
+                    dot.style.background = '#ff9500'; // Orange for degraded
+                    dot.style.boxShadow = '0 0 10px #ff9500';
+                }
+                if (lastUpdated) lastUpdated.textContent = 'Degraded Mode';
+            } else {
+                if (dot) {
+                    dot.style.background = '#22c55e'; // Success green
+                    dot.style.boxShadow = '0 0 10px rgba(34,197,94,0.4)';
+                }
+            }
+            
+            // Render UI with Fallbacks
+            const from = data.from_currency || 'SGD';
+            const to = data.to_currency || 'PHP';
+            const rateRaw = data.rate;
+            const rate = (rateRaw && !isNaN(rateRaw)) ? parseFloat(rateRaw).toFixed(2) : '--.--';
+
+            greetingEl.textContent = `Hello, ${name} \u{1F44B}`;
+            greetingSubEl.textContent = `Real-time exchange rates`;
+
+            // Dual-Currency Rendering (Premium UX)
+            if (data.is_ph) {
+                secondaryReference.classList.remove('hidden');
+                // Strict Rule: If base is USD, show (~₱[rate]). If other, show (~$[usd_equiv]).
+                if (from === 'USD') {
+                    secondaryRateEl.textContent = rate;
+                    secondaryReference.innerHTML = `(~₱${rate})`;
+                } else {
+                    const usdEquiv = (data.rate / (data.usd_rate || 56.4)).toFixed(2);
+                    secondaryRateEl.textContent = usdEquiv;
+                    secondaryReference.innerHTML = `(~$${usdEquiv})`;
+                }
+            } else {
+                secondaryReference.classList.add('hidden');
+            }
+
+
+
+            // Social Mode Fast-path UI adjustments
+            const isSocialMode = data.social_mode || window.isSocialWebview;
+            if (isSocialMode) {
+
+                // Remove heavy backdrop blur in social mode for faster rendering
+                if (dashboardDiv) {
+                    dashboardDiv.style.backdropFilter = 'none';
+                    dashboardDiv.style.webkitBackdropFilter = 'none';
+                }
+                // Disable CSS animations that may freeze WebKit-based in-app browsers
+                const slideshowEl = document.querySelector('.slideshow-container');
+                if (slideshowEl) slideshowEl.style.display = 'none';
+            }
+
+            // Handling Geo-Conditional Switcher
+            if (data.currency_locked) {
+                // Not in PH -> Lock UI
+                if (phSelectorContainer) phSelectorContainer.classList.remove('active');
+                if (baseCurrencyLabelEl) {
+                    baseCurrencyLabelEl.style.display = 'inline';
+                    baseCurrencyLabelEl.textContent = `1 ${data.from_currency}`;
+                }
+            } else {
+                // In PH -> Show Switcher
+                if (baseCurrencyLabelEl) baseCurrencyLabelEl.style.display = 'none';
+                if (phSelectorContainer) phSelectorContainer.classList.add('active');
+                if (baseCurrencySelect) baseCurrencySelect.value = data.from_currency;
+            }
+
+            if (targetCurrencyLabelEl) targetCurrencyLabelEl.textContent = data.to_currency;
+            
+            // Single Source of Math: Using rate exactly as provided by Worker
+            const currentContent = rateValueEl.textContent.replace(/,/g, '');
+            animateNumber(rateValueEl, parseFloat(currentContent) || 0, data.rate);
+            
+            targetSymbolEl.textContent = data.target_symbol || '\u20B1';
+            lastUpdatedEl.textContent = `Updated ${new Date().toLocaleTimeString([], { hour: '2-digit', minute:'2-digit' })}`;
+            
+            rateValueEl.parentElement.style.opacity = '1';
+
+            // ✅ Signal success ONLY after content is rendered
+            window.appLoaded = true;
+            clearTimeout(window.appBootTimeout);
+
+            // Fetch and draw the historical trend silently in the background
+            fetchAndDrawTrend(data.from_currency);
+
         } catch (error) {
             console.error('Failed to fetch rate:', error);
-            if (rateCache) renderUI(rateCache);
-            else rateValueEl.textContent = 'Err';
-        }
-    }
+            rateValueEl.textContent = 'Err';
+            rateValueEl.parentElement.style.opacity = '1';
 
-    function renderUI(data) {
-        if (!data) return;
-
-        // Persist detected country
-        if (data.country) {
-            localStorage.setItem('ofw_pesorate_country', data.country);
-        }
-
-        const dot = document.querySelector('.dot');
-        if (data.status === 'DEGRADED') {
-            if (dot) {
-                dot.style.background = '#ff9500';
-                dot.style.boxShadow = '0 0 10px #ff9500';
-            }
-            if (lastUpdatedEl) lastUpdatedEl.textContent = 'Degraded Mode';
-        } else {
-            if (dot) {
-                dot.style.background = '#22c55e';
-                dot.style.boxShadow = '0 0 10px rgba(34,197,94,0.4)';
+            // Report failed load for social traffic analytics
+            try {
+                if (isSocialWebview) {
+                    navigator.sendBeacon('/api/social-event', JSON.stringify({ event: 'load_failed' }));
+                }
+            } catch (_) { /* silent */ }
+            
+            // Show fallback UI on ANY fetch failure (first load or retry)
+            if (!window.appLoaded) {
+                const fallback = document.getElementById('fallback-ui');
+                const loader = document.getElementById('app-boot-loading');
+                if (loader) loader.style.display = 'none';
+                if (fallback) fallback.classList.remove('hidden');
             }
         }
-
-        greetingSubEl.textContent = `Real-time exchange rates`;
-
-        // =============================================
-        // MASTER REFERENCE: GEO-FENCED DISPLAY LOGIC
-        // =============================================
-        if (data.is_ph) {
-            // PH USER: Show dropdown, show secondary USD reference
-            if (phSelectorContainer) phSelectorContainer.style.display = 'flex';
-            if (baseCurrencyLabelEl) baseCurrencyLabelEl.style.display = 'none';
-            // Sync dropdown to current currency (not PHP)
-            if (baseCurrencySelect && data.from_currency && data.from_currency !== 'PHP') {
-                baseCurrencySelect.value = data.from_currency;
-            }
-            // Secondary: show USD equivalent (e.g. 1 SAR = ~$0.27)
-            secondaryReference.classList.remove('hidden');
-            const usdEquiv = (data.rate / (data.usd_rate || 60.5)).toFixed(2);
-            const prefix = data.from_currency === 'USD' ? '~₱' : '~$';
-            const secVal = data.from_currency === 'USD' ? data.rate.toFixed(2) : usdEquiv;
-            secondaryReference.innerHTML = `(${prefix}<span id="secondary-rate">${secVal}</span>)`;
-        } else {
-            // NON-PH USER: Hide dropdown, show locked currency label
-            if (phSelectorContainer) phSelectorContainer.style.display = 'none';
-            if (baseCurrencyLabelEl) {
-                baseCurrencyLabelEl.style.display = 'inline';
-                baseCurrencyLabelEl.textContent = `${data.symbol || ''} 1 ${data.from_currency}`;
-            }
-            // No secondary reference for non-PH users
-            secondaryReference.classList.add('hidden');
-        }
-
-        if (targetCurrencyLabelEl) targetCurrencyLabelEl.textContent = data.to_currency;
-        targetSymbolEl.textContent = data.target_symbol || '₱';
-        
-        const syncTime = data._meta?.updated ? new Date(data._meta.updated) : new Date();
-        lastUpdatedEl.textContent = `Updated ${syncTime.toLocaleTimeString([], { hour: '2-digit', minute:'2-digit' })}`;
-        
-        if (data._meta?.is_stale) {
-            lastUpdatedEl.style.color = '#ff9500';
-            lastUpdatedEl.textContent += ' [STALE]';
-        } else {
-            lastUpdatedEl.style.color = '';
-        }
-
-        window.appLoaded = true;
-        clearTimeout(window.appBootTimeout);
     }
 
     function animateNumber(el, start, end) {
@@ -376,18 +324,13 @@
         
         try {
             const res = await fetch('/api/trends');
+            if (!res.ok) return;
             const data = await res.json();
-
-            // If no data yet, draw a "Building..." placeholder
             if (!data.trends || data.trends.length < 2) {
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                ctx.fillStyle = 'rgba(0,0,0,0.3)';
-                ctx.font = '11px Inter, sans-serif';
-                ctx.textAlign = 'center';
-                ctx.fillText('📈 Building 7-day trend...', canvas.width / 2, canvas.height / 2);
+                ctx.clearRect(0,0, canvas.width, canvas.height);
                 return;
             }
-
+            
             // Extract the rates for this specific currency pair over time
             const points = data.trends.map(t => parseFloat(t.rates[baseCurrency] || 0)).filter(p => p > 0);
             if (points.length < 2) return;

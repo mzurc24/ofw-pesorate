@@ -110,13 +110,13 @@
             background-size: cover;
             background-position: center;
             opacity: 0;
-            filter: brightness(1.05) contrast(1.02) saturate(0.95);
+            filter: brightness(1.1) contrast(1.05) saturate(0.8);
             animation: slide-anim 24s infinite;
             transition: all 0.5s var(--easing);
         }
 
         .slide:hover {
-            filter: brightness(1.08) contrast(1.05) saturate(1);
+            filter: brightness(1.15) contrast(1.08) saturate(1);
             opacity: 1;
         }
 
@@ -827,60 +827,35 @@
             <div class="rate-label" id="currency-pair">
                 <!-- Universal Currency Selector -->
                 <span id="base-currency-label" style="display:none;font-weight:700;"></span>
-                <div id="currency-selector-container" class="currency-selector-container" style="display:none">
+                <div id="currency-selector-container" class="currency-selector-container active">
                     <span>1</span>
                     <select id="base-currency-select" class="currency-select">
-                        <!-- Default: USD (per Master Reference for PH users) -->
-                        <option value="USD">USA ($)</option>
-                        <!-- Middle East -->
-                        <option value="SAR">Saudi Arabia (﷼)</option>
-                        <option value="AED">UAE (د.إ)</option>
-                        <option value="QAR">Qatar (﷼)</option>
-                        <option value="KWD">Kuwait (د.ك)</option>
-                        <option value="BHD">Bahrain (.د.ب)</option>
-                        <option value="OMR">Oman (﷼)</option>
-                        <option value="ILS">Israel (₪)</option>
-                        <option value="JOD">Jordan (JD)</option>
-                        <option value="LBP">Lebanon (L£)</option>
-                        <!-- Asia -->
-                        <option value="SGD">Singapore ($)</option>
-                        <option value="HKD">Hong Kong ($)</option>
-                        <option value="TWD">Taiwan (NT$)</option>
-                        <option value="JPY">Japan (¥)</option>
-                        <option value="KRW">South Korea (₩)</option>
-                        <option value="MYR">Malaysia (RM)</option>
-                        <option value="THB">Thailand (฿)</option>
-                        <option value="MOP">Macau (MOP$)</option>
-                        <option value="CNY">China (¥)</option>
-                        <option value="BND">Brunei ($)</option>
-                        <option value="VND">Vietnam (₫)</option>
-                        <option value="MVR">Maldives (Rf)</option>
-                        <!-- Europe -->
-                        <option value="GBP">UK (£)</option>
-                        <option value="EUR">Eurozone (€)</option>
-                        <option value="PLN">Poland (zł)</option>
-                        <option value="HUF">Hungary (Ft)</option>
-                        <option value="CZK">Czech Republic (Kč)</option>
-                        <option value="RON">Romania (lei)</option>
-                        <option value="NOK">Norway (kr)</option>
-                        <option value="DKK">Denmark (kr)</option>
-                        <option value="RUB">Russia (₽)</option>
-                        <!-- Americas -->
-                        <option value="CAD">Canada ($)</option>
-                        <option value="KYD">Cayman Islands ($)</option>
-                        <option value="MXN">Mexico ($)</option>
-                        <option value="BRL">Brazil (R$)</option>
-                        <!-- Oceania -->
-                        <option value="AUD">Australia ($)</option>
-                        <option value="NZD">New Zealand ($)</option>
-                        <option value="PGK">Papua New Guinea (K)</option>
-                        <!-- Africa -->
-                        <option value="MAD">Morocco (DH)</option>
-                        <option value="NGN">Nigeria (₦)</option>
-                        <option value="MZN">Mozambique (MT)</option>
-                        <option value="EGP">Egypt (E£)</option>
-                        <option value="SCR">Seychelles (SR)</option>
-                        <option value="DZD">Algeria (DA)</option>
+                        <option value="SGD">SGD (S$)</option>
+                        <option value="PHP">PHP (₱)</option>
+                        <option value="USD">USD ($)</option>
+                        <option value="SAR">SAR (﷼)</option>
+                        <option value="AED">AED (د.إ)</option>
+                        <option value="GBP">GBP (£)</option>
+                        <option value="EUR">EUR (€)</option>
+                        <option value="JPY">JPY (¥)</option>
+                        <option value="MYR">RM</option>
+                        <option value="HKD">HKD (HK$)</option>
+                        <!-- GCC Additions -->
+                        <option value="QAR">QAR (﷼)</option>
+                        <option value="KWD">KWD (د.ك)</option>
+                        <option value="OMR">OMR (﷼)</option>
+                        <option value="BHD">BHD (.د.ب)</option>
+                        <!-- CAN/AUS/NZ Additions -->
+                        <option value="CAD">CAD ($)</option>
+                        <option value="AUD">AUD ($)</option>
+                        <option value="NZD">NZD ($)</option>
+                        <!-- South/East Asia Additions -->
+                        <option value="TWD">TWD (NT$)</option>
+                        <option value="KRW">KRW (₩)</option>
+                        <option value="CNY">CNY (¥)</option>
+                        <option value="THB">THB (฿)</option>
+                        <option value="IDR">IDR (Rp)</option>
+                        <option value="VND">VND (₫)</option>
                     </select>
                 </div>
 
@@ -913,9 +888,7 @@
     </div>
 
 
-
-
-    <script src="app.js?v=20260423_05"></script>
+    <script src="app.js?v=4.5.1"></script>
 
 
 
