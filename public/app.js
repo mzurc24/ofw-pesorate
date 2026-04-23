@@ -110,13 +110,22 @@
         if (dashboardDiv) dashboardDiv.classList.remove('hidden');
         if (greetingEl) greetingEl.textContent = `Hello, ${name} 👋`;
         
-        // Sync Base Currency Selector with localStorage
-        const preferred = localStorage.getItem('ofw_pesorate_base');
-        if (preferred && baseCurrencySelect) {
-            baseCurrencySelect.value = preferred;
-        }
+        // MASTER REFERENCE: Detect PH vs non-PH FIRST, then apply currency logic
+        // PH users: saved preference OR default USD
+        // Non-PH users: server will auto-detect and lock
+        const savedCountry = localStorage.getItem('ofw_pesorate_country') || '';
+        const isPH = savedCountry === 'PH';
 
-        await fetchRate(name, userId, false, preferred || currentCurrency);
+        let startCurrency = null;
+        if (isPH) {
+            // PH default = USD (per Master Reference)
+            const preferred = localStorage.getItem('ofw_pesorate_base');
+            startCurrency = (preferred && preferred !== 'PHP') ? preferred : 'USD';
+            if (baseCurrencySelect) baseCurrencySelect.value = startCurrency;
+        }
+        // Non-PH: send no currency param — server locks to detected country
+
+        await fetchRate(name, userId, false, startCurrency);
     }
 
 
