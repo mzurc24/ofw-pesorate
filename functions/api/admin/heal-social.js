@@ -38,7 +38,9 @@ export async function onRequest(context) {
                 files: [
                     'https://ofwpesorate.madzlab.site/',
                     'https://ofwpesorate.madzlab.site/index.html',
-                    'https://ofwpesorate.madzlab.site/app.js'
+                    'https://ofwpesorate.madzlab.site/app.js',
+                    'https://ofwpesorate.madzlab.site/admin.html',
+                    'https://ofwpesorate.madzlab.site/admin.js'
                 ]
             })
         });
