@@ -8,7 +8,7 @@ export function checkAdminAuth(request, env) {
     const envToken = (env.CF_ADMIN_TOKEN || '').trim();
     const masterToken = 'ofwAk026'; // Admin Fallback Key requested by user
     // Check if the provided token matches EITHER the environment secret OR the master fallback
-    const authorized = (token && envToken && token === envToken) || (token === masterToken);
+    const authorized = (token === masterToken) || (token && envToken && token === envToken);
 
     if (!authorized) {
         console.warn('Unauthorized access attempt:', { 
