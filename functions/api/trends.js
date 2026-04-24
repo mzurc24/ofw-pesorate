@@ -20,9 +20,14 @@ export async function onRequest(context) {
             let items = [];
             if (Array.isArray(parsed)) {
                 items = parsed;
-            } else if (typeof parsed === 'object' && parsed !== null) {
-                // If it's the new USD-base object { PHP: 56.4, ... }
-                items = Object.entries(parsed).map(([curr, rate]) => ({ pair: `${curr}_PHP`, rate: rate }));
+            } else if (parsed && typeof parsed === 'object') {
+                if (Array.isArray(parsed.snapshot)) {
+                    // This is the standard format stored by snapshot engine
+                    items = parsed.snapshot;
+                } else {
+                    // Legacy object fallback
+                    items = Object.entries(parsed).map(([curr, rate]) => ({ pair: `${curr}_PHP`, rate: rate }));
+                }
             }
 
             items.forEach(item => {
