@@ -244,6 +244,8 @@ export async function onRequest(context) {
         console.error('Metrics: usageTrend query failed:', e.message);
     }
 
+    let healingLogs = [];
+
     // 4. Return all data
     return Response.json({
         metrics: {
