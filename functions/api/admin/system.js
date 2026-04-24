@@ -32,7 +32,7 @@ export async function onRequest(context) {
 
     if (env.DB) {
         try {
-            const dbRow = await env.DB.prepare("SELECT rates_json, updated_at FROM rates_cache WHERE base_currency = 'EUR'").first();
+            const dbRow = await env.DB.prepare("SELECT rates_json, updated_at FROM rates_cache WHERE base_currency = 'USD'").first();
             
             // Try Twelve Data key first, then legacy Fixer key
             let lastFetchRow = await env.DB.prepare("SELECT value, 'last_twelvedata_fetch' as key FROM settings WHERE key = 'last_twelvedata_fetch'").first();

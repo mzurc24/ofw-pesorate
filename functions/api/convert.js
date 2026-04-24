@@ -57,7 +57,7 @@ export async function onRequest(context) {
     let rates        = null;
     let strategyData = 'fallback';
 
-    const cached = await safeDbQuery(env, `SELECT rates_json FROM rates_cache WHERE base_currency = 'EUR'`);
+    const cached = await safeDbQuery(env, `SELECT rates_json FROM rates_cache WHERE base_currency = 'USD'`);
     if (cached?.rates_json) {
         try { 
             rates = JSON.parse(cached.rates_json); 

@@ -1,4 +1,4 @@
-﻿/**
+/**
  * /api/admin/metrics
  * Returns analytics data: 7-day trends, country breakdown, currency snapshots.
  * Security: Bearer Token Auth + Rate Limiting
@@ -150,7 +150,7 @@ export async function onRequest(context) {
         if (!hasTodayEntry && env.DB) {
             try {
                 const ratesRow = await env.DB.prepare(
-                    "SELECT rates_json FROM rates_cache WHERE base_currency = 'EUR'"
+                    "SELECT rates_json FROM rates_cache WHERE base_currency = 'USD'"
                 ).first();
 
                 if (ratesRow) {
