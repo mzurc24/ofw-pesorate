@@ -1136,7 +1136,7 @@
                 refreshAll();
             } else {
                 showToast('error', 'Snapshot failed: ' + (data?.message || 'Unknown error'));
-                addLog('error', 'Snapshot exception: ' + e.message);
+                addLog('error', 'Snapshot failed: ' + (data?.message || 'Unknown'));
             }
         } catch (e) {
             showToast('error', 'Snapshot failed: ' + e.message);

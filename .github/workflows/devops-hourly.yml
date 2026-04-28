@@ -59,6 +59,8 @@ jobs:
       # ── Snapshot: Runs UNCONDITIONALLY every hour ──
       # Reads from D1 only (zero API credits). Safe to run frequently.
       - name: "📸 Trend Snapshot (D1-Only, Zero Credits)"
+        env:
+          CF_ADMIN_TOKEN: ${{ secrets.CF_ADMIN_TOKEN }}
         run: |
           echo "📸 Saving currency trend snapshot at $(date -u)"
           RESPONSE=$(curl -s -w "\n%{http_code}" \
@@ -73,8 +75,6 @@ jobs:
           else
             echo "⚠️  Snapshot returned HTTP $HTTP_CODE (non-fatal)."
           fi
-        env:
-          CF_ADMIN_TOKEN: ${{ secrets.CF_ADMIN_TOKEN }}
 
       # ── Alert Engine: Only fires if scan showed something important ──
       - name: "🔔 Notification Alert Engine"

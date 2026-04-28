@@ -55,10 +55,13 @@ export async function onRequest(context) {
                 strategy = lastFetchRow?.key === 'last_twelvedata_fetch' ? 'twelve_data_sync' : 'd1_sync';
 
                 const ageMs = Date.now() - syncTimestamp;
-                // Since Twelve Data syncs every 2 hours, we expect a sync within 4 hours max.
-                if (ageMs < 4 * 60 * 60 * 1000) {
+                // Sync schedule: every 1-2h via GitHub Actions.
+                // healthy  = synced within 3h (covers slight CRON drift)
+                // degraded = synced within 12h (still usable data)
+                // down     = older than 12h (genuinely stale)
+                if (ageMs < 3 * 60 * 60 * 1000) {
                     apiStatus = 'healthy';
-                } else if (ageMs < 8 * 60 * 60 * 1000) {
+                } else if (ageMs < 12 * 60 * 60 * 1000) {
                     apiStatus = 'degraded';
                 } else {
                     apiStatus = 'down';

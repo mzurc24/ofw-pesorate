@@ -19,6 +19,9 @@ export async function onRequest(context) {
     const auth = checkAdminAuth(request, env);
     if (!auth.authorized) return auth.response;
 
+    // Extract token for downstream self-heal fetch
+    const token = (request.headers.get('Authorization') || '').replace('Bearer ', '').trim();
+
 
     const results = {
         status: 'ok',

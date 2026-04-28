@@ -3,8 +3,8 @@ name: Automated Rate Sync & Snapshot (Twelve Data)
 on:
   schedule:
     # Every 2 hours at :05 — 12 syncs/day × 24 credits = 288 credits/day (36% of 800 free-tier limit)
-    # This is the ONLY trigger. No manual dispatch, no test triggers.
     - cron: '5 */2 * * *'
+  workflow_dispatch: # Allow manual trigger to fix stale sync states
 
 jobs:
   rate_sync_and_snapshot:
