@@ -6,7 +6,8 @@
 const { execSync } = require('child_process');
 
 // CONFIGURATION
-const ADMIN_TOKEN = process.env.CF_ADMIN_TOKEN || 'ofwAk026';
+const ADMIN_TOKEN = process.env.CF_ADMIN_TOKEN;
+if (!ADMIN_TOKEN) { console.error('❌ CF_ADMIN_TOKEN env var is required'); process.exit(1); }
 const LAST_REDEPLOY_KEY = 'ofw_last_redeploy_ts';
 
 async function logAgent(msg) {

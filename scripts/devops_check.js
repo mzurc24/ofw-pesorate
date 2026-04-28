@@ -10,7 +10,8 @@
 const fs = require('fs');
 
 async function checkHealth() {
-    const ADMIN_TOKEN = process.env.CF_ADMIN_TOKEN || 'ofwAk026';
+    const ADMIN_TOKEN = process.env.CF_ADMIN_TOKEN;
+    if (!ADMIN_TOKEN) { console.error('❌ CF_ADMIN_TOKEN env var is required'); process.exit(1); }
     const baseUrl = 'https://ofwpesorate.madzlab.site';
 
     console.log(`🔍 DevOps Check triggered at ${new Date().toISOString()}`);

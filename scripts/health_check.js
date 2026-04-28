@@ -7,7 +7,8 @@
 const puppeteer = require('puppeteer');
 
 const TEST_URL = process.env.TEST_URL || 'https://ofwpesorate.madzlab.site/';
-const TEST_TOKEN = process.env.CF_ADMIN_TOKEN || 'ofwAk026';
+const TEST_TOKEN = process.env.CF_ADMIN_TOKEN;
+if (!TEST_TOKEN) { console.error('❌ CF_ADMIN_TOKEN env var is required'); process.exit(1); }
 
 const REGIONS = [
     { country: 'MY', name: 'Malaysia' },

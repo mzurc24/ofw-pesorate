@@ -8,8 +8,9 @@ const { execSync } = require('child_process');
 
 // CONFIGURATION
 const BASE_URL = process.env.TEST_URL || 'https://ofwpesorate.madzlab.site';
-const ADMIN_TOKEN = process.env.CF_ADMIN_TOKEN || 'ofwAk026';
-const SYNC_URL = `${BASE_URL}/api/admin/sync?token=${ADMIN_TOKEN}&force=true`;
+const ADMIN_TOKEN = process.env.CF_ADMIN_TOKEN;
+if (!ADMIN_TOKEN) { console.error('❌ CF_ADMIN_TOKEN env var is required'); process.exit(1); }
+const SYNC_URL = `${BASE_URL}/api/admin/sync`;
 const RATES_URL = `${BASE_URL}/api/rates?base=USD`;
 
 async function runStep(name, fn) {
@@ -44,9 +45,12 @@ async function main() {
         console.log(`⚠️ CACHE NEEDS REFRESH (Age: ${Math.round(ageSecs/3600)}h, Count: ${ratesCount})`);
     }
 
-    // STEP 3: Controlled Twelve Data Sync
-    const syncResult = await runStep("3: CONTROLLED TWELVE DATA SYNC", async () => {
-        const res = await fetch(SYNC_URL);
+    // STEP 3: Controlled Sync
+    const syncResult = await runStep("3: CONTROLLED SYNC", async () => {
+        const res = await fetch(SYNC_URL, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${ADMIN_TOKEN}` }
+        });
         const data = await res.json();
         console.log(`[AGENT] Sync Response: ${data.status} - ${data.message}`);
         return data;
@@ -56,9 +60,12 @@ async function main() {
     if (syncResult && syncResult.status === 'error') {
         await runStep("4: LIMITED RETRY", async () => {
             console.log("[AGENT] Attempting Final Retry...");
-            const res = await fetch(SYNC_URL);
+            const res = await fetch(SYNC_URL, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${ADMIN_TOKEN}` }
+            });
             const data = await res.json();
-             console.log(`[AGENT] Retry Response: ${data.status}`);
+            console.log(`[AGENT] Retry Response: ${data.status}`);
             return data;
         });
     }
