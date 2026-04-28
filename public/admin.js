@@ -133,36 +133,8 @@
     // ══════════════════════════════════════════════════════════════════════
     // BUTTON HANDLERS
     // ══════════════════════════════════════════════════════════════════════
-    if (healSocialBtn) {
-        healSocialBtn.addEventListener('click', async () => {
-            if (!confirm('This will manually trigger a Cloudflare CDN purge and reset the social failure state. Proceed?')) return;
-            
-            healSocialBtn.disabled = true;
-            healSocialBtn.textContent = 'Healing...';
-            
-            try {
-                const res = await fetch('/api/admin/heal-social', {
-                    method: 'POST',
-                    headers: authHeaders()
-                });
-                const data = await res.json();
-                
-                if (data.status === 'success') {
-                    addLog('success', 'Manual healing successful: CDN purge triggered.');
-                    alert('✨ System successfully healed! The CDN cache has been purged.');
-                } else {
-                    addLog('error', `Healing failed: ${data.message || 'Unknown error'}`);
-                    alert(`❌ Healing failed: ${data.message || 'Check logs'}`);
-                }
-            } catch (e) {
-                addLog('error', `Healing error: ${e.message}`);
-            } finally {
-                healSocialBtn.disabled = false;
-                healSocialBtn.textContent = '🔧 Heal Now';
-                refreshAll();
-            }
-        });
-    }
+    // Heal Now button removed — CDN purge not required for normal operation
+    // healSocialBtn handler intentionally omitted
 
     // ══════════════════════════════════════════════════════════════════════
     // CENTRALIZED API LAYER (with retry, SWR, queue)
@@ -269,8 +241,7 @@
 
     async function refreshAll() {
         try {
-            // Separate Social & DevOps Init (Decoupled from blocking chain)
-            fetchSocialData();
+            // DevOps runs independently (non-blocking)
             fetchDevOpsStatus();
 
             const [systemData, metricsData] = await Promise.all([
@@ -289,6 +260,9 @@
                 if (metricsData.usageTrend) renderUsageChart(metricsData.usageTrend);
             }
 
+            // Social renders AFTER metrics is cached (reads from cachedMetricsData)
+            fetchSocialData();
+
             // Signal initialization success to watchdog
             window.dashboardInitialized = true;
             const overlay = $('loading-watchdog-overlay');
@@ -306,8 +280,8 @@
     function renderSystemData(data) {
         // Health status
         const health = data.health || {};
-        setStatusDot(apiStatusDot, apiStatusText, health.api || 'unknown');
-        setStatusDot(dbStatusDot, dbStatusText, health.db || 'unknown');
+        setStatusDot(apiStatusDot, apiStatusText, health.api || 'unknown', 'API');
+        setStatusDot(dbStatusDot, dbStatusText, health.db || 'unknown', 'DB');
 
         // Response time
         if (data._responseTime) {
@@ -350,10 +324,13 @@
         }
     }
 
-    function setStatusDot(dot, text, status) {
+    function setStatusDot(dot, text, status, prefix = '') {
         dot.className = 'status-dot ' + status;
-        const labels = { healthy: '🟢 Healthy', degraded: '🟡 Degraded', down: '🔴 Down', error: '🔴 Error', unknown: '⚪ Unknown' };
-        text.textContent = labels[status] || status;
+        const labels = { healthy: 'Healthy', degraded: 'Degraded', down: 'Down', error: 'Error', unknown: 'Unknown' };
+        const label = labels[status] || status;
+        text.innerHTML = prefix
+            ? `<span style="color:var(--text-muted);font-size:0.75rem;margin-right:4px">${prefix}</span>${label}`
+            : label;
     }
 
     function renderRateTable(data) {
@@ -420,40 +397,36 @@
     // RENDER: Metrics (Conversion rates, currency trends, social traffic)
     // ══════════════════════════════════════════════════════════════════════
     async function fetchSocialData() {
-        const socialStatusText = $('social-status-text');
-        const cardsEl = $('social-platform-cards');
-        const barChartEl = $('social-bar-chart');
-
-        const fallbackData = {
-            status: 'DEGRADED',
-            platforms: [
-                { name: 'Facebook', clicks: 0 },
-                { name: 'WhatsApp', clicks: 0 },
-                { name: 'Telegram', clicks: 0 }
-            ]
-        };
-
-        try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 3000); // Strict 3s timeout (STEP 1)
-
-            const res = await fetch('/api/social', { 
-                signal: controller.signal,
-                headers: authHeaders()
-            });
-            clearTimeout(timeoutId);
-
-            if (!res.ok) throw new Error('API_DOWN');
-            const data = await res.json();
-            
-            if (!data || !data.platforms) throw new Error('INVALID_JSON');
-
-            renderSocialAnalytics(data, data.status === 'DEGRADED');
-
-        } catch (e) {
-            console.warn(`🛠️ Social API failed: ${e.message}`);
-            console.error('🛠️ Social Module entering SAFE MODE / DEGRADED.');
-            renderSocialAnalytics(fallbackData, true);
+        // Social data is loaded from /api/admin/metrics (already auth-protected)
+        // We wait for cachedMetricsData to be populated, then render from it.
+        // This avoids the unauthenticated /api/social endpoint which always degraded.
+        if (cachedMetricsData?.socialTraffic) {
+            const social = cachedMetricsData.socialTraffic;
+            // Normalise to { platforms: [{name, clicks}] } shape
+            const platforms = (social.platforms || []).map(p => ({
+                name: p.name || p.platform || 'Unknown',
+                clicks: p.clicks || p.count || 0
+            }));
+            renderSocialAnalytics({ platforms, status: 'OK' }, false);
+        } else {
+            // Metrics not loaded yet — fetch it directly
+            try {
+                const data = await fetchWithRetry('/api/admin/metrics', { headers: authHeaders() });
+                if (data?.socialTraffic) {
+                    const social = data.socialTraffic;
+                    const platforms = (social.platforms || []).map(p => ({
+                        name: p.name || p.platform || 'Unknown',
+                        clicks: p.clicks || p.count || 0
+                    }));
+                    renderSocialAnalytics({ platforms, status: 'OK' }, false);
+                } else {
+                    // No data yet — show empty state (not ERROR)
+                    renderSocialAnalytics({ platforms: [], status: 'OK' }, false);
+                }
+            } catch (e) {
+                console.warn('Social data fetch failed:', e.message);
+                renderSocialAnalytics({ platforms: [], status: 'OK' }, false);
+            }
         }
     }
 
